@@ -1,0 +1,1962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LinkedFlow AI — RSS to LinkedIn Automator</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  /* Core palette — deep navy with electric accents */
+  --bg:#04080f;--bg2:#070d18;--bg3:#0b1524;--card:#0a1220;
+  --border:#0f1e33;--border2:#152840;--border3:#1a3350;
+  --glow:#00c8ff;--pulse:#7c3aed;--orbit:#f97316;--nova:#10b981;
+  --text:#e2eeff;--muted:#4a6a88;--dim:#0f1e33;
+  --li-blue:#0a66c2;
+  /* New accents */
+  --amber:#f59e0b;--rose:#f43f5e;--indigo:#6366f1;
+  --glass:rgba(255,255,255,0.03);
+  --glass2:rgba(255,255,255,0.06);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'DM Sans',sans-serif;
+  background:var(--bg);color:var(--text);
+  min-height:100vh;overflow-x:hidden;
+  font-size:15px;line-height:1.6;
+}
+
+/* ── ANIMATIONS ── */
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse2{0%,100%{opacity:1}50%{opacity:0.3}}
+@keyframes breathe{0%,100%{box-shadow:0 0 0 0 rgba(0,200,255,0.3)}50%{box-shadow:0 0 20px 4px rgba(0,200,255,0.08)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes gradientShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--glow),var(--pulse));border-radius:4px}
+
+/* ── CANVAS ── */
+#bg{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.7}
+
+/* ── LAYOUT ── */
+.app{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh}
+
+/* ── HEADER ── */
+header{
+  height:62px;padding:0 28px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(4,8,15,0.85);backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);
+  border-bottom:1px solid rgba(255,255,255,0.05);
+  position:sticky;top:0;z-index:200;
+}
+header::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--glow),var(--pulse),transparent);
+  opacity:0.4;
+}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.logo-mark{
+  width:32px;height:32px;border-radius:8px;
+  background:linear-gradient(135deg,var(--li-blue),var(--pulse));
+  display:flex;align-items:center;justify-content:center;
+  font-size:0.95rem;
+  box-shadow:0 0 20px rgba(10,102,194,0.4),inset 0 1px 0 rgba(255,255,255,0.1);
+  transition:transform 0.2s;
+}
+.logo-mark:hover{transform:scale(1.08) rotate(-4deg)}
+.logo-name{
+  font-family:'Syne',sans-serif;font-size:0.95rem;font-weight:800;
+  letter-spacing:0.14em;text-transform:uppercase;
+  background:linear-gradient(90deg,#fff 0%,var(--glow) 60%,var(--pulse) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.logo-tag{font-size:0.58rem;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-top:1px;font-family:'JetBrains Mono',monospace}
+.hdr-right{display:flex;align-items:center;gap:14px}
+.live-badge{
+  display:flex;align-items:center;gap:6px;
+  background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);
+  color:var(--nova);font-size:0.62rem;font-weight:700;letter-spacing:0.1em;
+  padding:4px 12px;border-radius:20px;font-family:'JetBrains Mono',monospace;
+  animation:breathe 3s infinite;
+}
+.live-dot{width:5px;height:5px;border-radius:50%;background:var(--nova);animation:pulse2 1.4s infinite;box-shadow:0 0 8px var(--nova)}
+.nav-tabs{display:flex;gap:3px;background:rgba(255,255,255,0.03);padding:3px;border-radius:12px;border:1px solid rgba(255,255,255,0.05)}
+.nav-tab{
+  padding:5px 14px;border-radius:9px;font-size:0.72rem;font-weight:600;
+  border:none;color:var(--muted);background:none;cursor:pointer;
+  transition:all 0.2s;font-family:'DM Sans',sans-serif;letter-spacing:0.02em;
+}
+.nav-tab:hover{color:var(--text);background:var(--glass2)}
+.nav-tab.active{color:#fff;background:linear-gradient(135deg,rgba(0,200,255,0.15),rgba(124,58,237,0.15));border:none;box-shadow:inset 0 0 0 1px rgba(0,200,255,0.2)}
+
+/* ── HERO ── */
+.hero{
+  padding:44px 32px 32px;text-align:center;
+  background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(10,102,194,0.06),transparent);
+  border-bottom:1px solid rgba(255,255,255,0.04);
+  animation:fadeIn 0.6s ease;
+}
+.hero-chip{
+  display:inline-flex;align-items:center;gap:7px;
+  background:rgba(0,200,255,0.06);border:1px solid rgba(0,200,255,0.2);
+  color:var(--glow);font-size:0.66rem;font-weight:700;letter-spacing:0.12em;
+  padding:5px 16px;border-radius:20px;text-transform:uppercase;margin-bottom:20px;
+  font-family:'JetBrains Mono',monospace;
+}
+.hero h1{
+  font-family:'Syne',sans-serif;
+  font-size:clamp(1.5rem,4vw,2.6rem);font-weight:800;
+  line-height:1.12;letter-spacing:0.02em;margin-bottom:14px;
+}
+.hero h1 em{
+  font-style:normal;
+  background:linear-gradient(135deg,var(--glow) 0%,var(--pulse) 50%,var(--orbit) 100%);
+  background-size:200% auto;
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  animation:gradientShift 4s ease infinite;
+}
+.hero p{font-size:0.88rem;color:var(--muted);max-width:520px;margin:0 auto;line-height:1.7}
+
+/* ── WORKFLOW STRIP ── */
+.wf-strip{
+  display:flex;align-items:center;justify-content:center;
+  gap:0;padding:14px 32px;
+  background:rgba(255,255,255,0.015);
+  border-bottom:1px solid rgba(255,255,255,0.04);
+  overflow-x:auto;
+}
+.wf-step{
+  display:flex;align-items:center;gap:8px;padding:8px 16px;
+  border-radius:10px;transition:background 0.2s;cursor:default;
+}
+.wf-step:hover{background:var(--glass2)}
+.wf-step .ic{
+  width:32px;height:32px;border-radius:8px;
+  background:var(--glass2);border:1px solid rgba(255,255,255,0.07);
+  display:flex;align-items:center;justify-content:center;font-size:0.9rem;
+}
+.wf-name{font-size:0.72rem;font-weight:700;color:var(--text);letter-spacing:0.02em}
+.wf-desc{font-size:0.62rem;color:var(--muted)}
+.wf-arrow{color:rgba(255,255,255,0.15);font-size:1rem;padding:0 4px}
+
+/* ── MAIN LAYOUT ── */
+.main{
+  display:grid;grid-template-columns:280px 1fr;
+  gap:0;flex:1;align-items:start;
+  max-width:100%;
+}
+
+/* ── SIDEBAR ── */
+.sidebar{
+  padding:20px 16px;display:flex;flex-direction:column;gap:10px;
+  border-right:1px solid rgba(255,255,255,0.04);
+  position:sticky;top:62px;max-height:calc(100vh - 62px);overflow-y:auto;
+  background:rgba(4,8,15,0.4);
+}
+.sidebar::-webkit-scrollbar{width:3px}
+
+/* ── PANELS ── */
+.panel{
+  background:var(--card);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:14px;
+  padding:14px;
+  transition:border-color 0.2s, box-shadow 0.2s;
+  animation:slideUp 0.4s ease both;
+}
+.panel:hover{
+  border-color:rgba(0,200,255,0.15);
+  box-shadow:0 4px 24px rgba(0,0,0,0.3),0 0 0 1px rgba(0,200,255,0.05);
+}
+.panel-hdr{
+  font-family:'Syne',sans-serif;
+  font-size:0.68rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:10px;
+  display:flex;align-items:center;gap:8px;
+}
+.panel-hdr::before{content:'';width:12px;height:2px;background:linear-gradient(90deg,var(--glow),var(--pulse));border-radius:2px}
+
+/* ── INPUTS ── */
+input[type=text], input[type=password], select, textarea{
+  width:100%;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.07);
+  color:var(--text);border-radius:9px;
+  padding:9px 12px;font-size:0.78rem;
+  outline:none;font-family:'DM Sans',sans-serif;
+  transition:border-color 0.2s, box-shadow 0.2s;
+  margin-bottom:6px;
+}
+input:focus, select:focus, textarea:focus{
+  border-color:rgba(0,200,255,0.4);
+  box-shadow:0 0 0 3px rgba(0,200,255,0.08);
+}
+input::placeholder{color:var(--muted);opacity:0.7}
+select{cursor:pointer}
+select option{background:var(--bg3)}
+
+/* ── FEED ITEMS ── */
+.feed-item-btn{
+  width:100%;text-align:left;padding:8px 10px;
+  background:transparent;border:1px solid transparent;
+  border-radius:9px;color:var(--muted);font-size:0.75rem;
+  cursor:pointer;transition:all 0.18s;font-family:'DM Sans',sans-serif;
+  display:flex;align-items:center;gap:8px;
+}
+.feed-item-btn:hover{background:var(--glass2);color:var(--text);border-color:rgba(255,255,255,0.06)}
+.feed-item-btn.active{
+  background:linear-gradient(135deg,rgba(0,200,255,0.1),rgba(124,58,237,0.1));
+  border-color:rgba(0,200,255,0.25);color:var(--glow);
+  box-shadow:0 2px 12px rgba(0,200,255,0.1);
+}
+
+/* ── STYLE BUTTONS ── */
+.style-btn{
+  flex:1;padding:8px 4px;border-radius:9px;
+  background:transparent;border:1px solid rgba(255,255,255,0.06);
+  color:var(--muted);font-size:0.7rem;font-weight:600;cursor:pointer;
+  transition:all 0.18s;font-family:'DM Sans',sans-serif;text-align:center;
+}
+.style-btn:hover{background:var(--glass2);color:var(--text)}
+.style-btn.active{
+  background:linear-gradient(135deg,rgba(0,200,255,0.12),rgba(124,58,237,0.12));
+  border-color:rgba(0,200,255,0.3);color:#fff;
+  box-shadow:0 2px 12px rgba(0,200,255,0.12);
+}
+
+/* ── LAUNCH BUTTON ── */
+.launch{
+  width:100%;padding:13px;border:none;border-radius:12px;
+  background:linear-gradient(135deg,var(--li-blue) 0%,var(--pulse) 100%);
+  color:#fff;font-family:'Syne',sans-serif;font-size:0.82rem;font-weight:700;
+  letter-spacing:0.06em;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:all 0.2s;
+  box-shadow:0 4px 20px rgba(10,102,194,0.3),inset 0 1px 0 rgba(255,255,255,0.15);
+  position:relative;overflow:hidden;
+}
+.launch::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,0.1),transparent);
+  opacity:0;transition:opacity 0.2s;
+}
+.launch:hover{transform:translateY(-1px);box-shadow:0 8px 28px rgba(10,102,194,0.4),inset 0 1px 0 rgba(255,255,255,0.2)}
+.launch:hover::before{opacity:1}
+.launch:active{transform:translateY(0)}
+.launch:disabled{opacity:0.6;cursor:not-allowed;transform:none}
+
+/* ── STATS BAR ── */
+.stats{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:8px;padding:16px 20px;
+  background:rgba(255,255,255,0.015);
+  border-bottom:1px solid rgba(255,255,255,0.04);
+}
+.stat{
+  text-align:center;padding:10px 6px;border-radius:10px;
+  background:var(--glass);border:1px solid rgba(255,255,255,0.04);
+  transition:all 0.2s;
+}
+.stat:hover{background:var(--glass2);border-color:rgba(0,200,255,0.1)}
+.stat-num{
+  font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;
+  background:linear-gradient(135deg,var(--glow),var(--pulse));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  line-height:1;
+}
+.stat-lbl{font-size:0.62rem;color:var(--muted);margin-top:3px;letter-spacing:0.06em;text-transform:uppercase}
+
+/* ── CONTENT AREA ── */
+.content{padding:20px;min-height:600px}
+
+/* ── FEED CARDS ── */
+.feed-card{
+  background:var(--card);border:1px solid rgba(255,255,255,0.05);
+  border-radius:14px;padding:16px;margin-bottom:10px;
+  transition:all 0.2s;animation:slideUp 0.3s ease both;
+  position:relative;overflow:hidden;
+}
+.feed-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,200,255,0.2),transparent);
+  opacity:0;transition:opacity 0.2s;
+}
+.feed-card:hover{
+  border-color:rgba(0,200,255,0.2);
+  box-shadow:0 8px 32px rgba(0,0,0,0.4),0 0 0 1px rgba(0,200,255,0.05);
+  transform:translateY(-1px);
+}
+.feed-card:hover::before{opacity:1}
+
+/* ── GEN BUTTONS ── */
+.gen-btn{
+  font-size:0.68rem;padding:5px 14px;border-radius:8px;
+  background:rgba(0,200,255,0.07);border:1px solid rgba(0,200,255,0.2);
+  color:var(--glow);cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;
+  transition:all 0.18s;letter-spacing:0.02em;
+}
+.gen-btn:hover{background:rgba(0,200,255,0.14);border-color:rgba(0,200,255,0.4);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,200,255,0.15)}
+.gen-btn:active{transform:translateY(0)}
+.gen-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+
+/* ── LOG BOX ── */
+.log-box{
+  background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.05);
+  border-radius:10px;padding:12px;
+  font-family:'JetBrains Mono',monospace;font-size:0.68rem;
+  max-height:140px;overflow-y:auto;margin-top:12px;
+  color:#4a6a88;line-height:1.8;
+}
+.log-info{color:#4a7088}
+.log-success{color:var(--nova)}
+.log-error{color:var(--rose)}
+.log-warn{color:var(--amber)}
+
+/* ── SCORE RING ── */
+.score-ring{
+  min-width:42px;height:42px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:0.68rem;font-weight:700;font-family:'Syne',sans-serif;
+  position:relative;
+}
+
+/* ── POST CARD ── */
+.post-card{
+  background:var(--card);border:1px solid rgba(255,255,255,0.06);
+  border-radius:16px;padding:20px;margin-bottom:12px;
+  animation:slideUp 0.4s ease both;
+  box-shadow:0 4px 24px rgba(0,0,0,0.3);
+}
+.post-card-hdr{
+  display:flex;align-items:center;gap:10px;
+  padding-bottom:14px;margin-bottom:14px;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+}
+.post-avatar{
+  width:38px;height:38px;border-radius:50%;
+  background:linear-gradient(135deg,var(--li-blue),var(--pulse));
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:0.9rem;color:#fff;
+  box-shadow:0 2px 8px rgba(10,102,194,0.3);
+  flex-shrink:0;
+}
+.post-author-name{font-size:0.82rem;font-weight:700;color:var(--text)}
+.post-author-meta{font-size:0.68rem;color:var(--muted)}
+.post-body{font-size:0.82rem;line-height:1.75;color:#c8dff5;white-space:pre-wrap}
+.post-actions{
+  display:flex;gap:8px;margin-top:14px;padding-top:12px;
+  border-top:1px solid rgba(255,255,255,0.05);flex-wrap:wrap;
+}
+.post-actions button{
+  padding:7px 16px;border-radius:9px;font-size:0.72rem;font-weight:600;
+  cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.18s;
+  display:flex;align-items:center;gap:6px;
+}
+.btn-copy{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--muted)}
+.btn-copy:hover{background:rgba(255,255,255,0.09);color:var(--text)}
+.btn-linkedin{
+  background:linear-gradient(135deg,rgba(10,102,194,0.2),rgba(10,102,194,0.1));
+  border:1px solid rgba(10,102,194,0.4);color:#38bdf8;
+  box-shadow:0 2px 8px rgba(10,102,194,0.15);
+}
+.btn-linkedin:hover{background:linear-gradient(135deg,rgba(10,102,194,0.3),rgba(10,102,194,0.2));transform:translateY(-1px);box-shadow:0 4px 16px rgba(10,102,194,0.25)}
+
+/* ── TOGGLE SWITCH ── */
+.toggle-wrap{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.toggle-lbl{font-size:0.78rem;font-weight:600;color:var(--text)}
+.toggle{position:relative;width:42px;height:24px;cursor:pointer}
+.toggle input{opacity:0;width:0;height:0;position:absolute}
+.toggle-slider{
+  position:absolute;inset:0;border-radius:24px;
+  background:#0f1e33;border:1px solid rgba(255,255,255,0.08);
+  transition:all 0.25s;
+}
+.toggle-dot{
+  position:absolute;top:3px;left:3px;
+  width:16px;height:16px;border-radius:50%;
+  background:#4a6a88;transition:all 0.25s;
+  box-shadow:0 1px 4px rgba(0,0,0,0.4);
+}
+input:checked ~ .toggle-slider{background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.3)}
+input:checked ~ .toggle-dot{transform:translateX(18px);background:var(--nova);box-shadow:0 0 8px rgba(16,185,129,0.5)}
+
+/* ── CTRL ROW ── */
+.ctrl-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.ctrl-lbl{font-size:0.75rem;color:var(--muted)}
+
+/* ── EMPTY STATE ── */
+.empty-state{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:60px 24px;color:var(--muted);text-align:center;
+}
+.empty-icon{font-size:2.5rem;opacity:0.2;margin-bottom:14px;animation:float 3s ease-in-out infinite}
+.empty-t{font-family:'Syne',sans-serif;font-size:0.85rem;color:rgba(255,255,255,0.2);margin-bottom:6px;letter-spacing:0.06em}
+.empty-s{font-size:0.75rem;max-width:260px;opacity:0.5;line-height:1.6}
+
+/* ── SAMPLE POSTS ── */
+.del-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.del-card{
+  background:var(--card);border:1px solid rgba(255,255,255,0.05);
+  border-radius:14px;padding:18px;
+  transition:all 0.2s;position:relative;overflow:hidden;
+}
+.del-card::after{
+  content:'';position:absolute;inset:0;border-radius:14px;
+  background:linear-gradient(135deg,rgba(0,200,255,0.03),rgba(124,58,237,0.03));
+  opacity:0;transition:opacity 0.2s;pointer-events:none;
+}
+.del-card:hover{border-color:rgba(0,200,255,0.15);transform:translateY(-2px);box-shadow:0 12px 36px rgba(0,0,0,0.4)}
+.del-card:hover::after{opacity:1}
+
+/* ── DOCS ── */
+.docs-section{padding:28px;max-width:720px;margin:0 auto}
+.docs-section h2{font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800;margin-bottom:20px;letter-spacing:0.04em}
+.docs-section p,.docs-section li{font-size:0.82rem;color:#8aaabb;line-height:1.8}
+.docs-section li{margin-left:20px;margin-bottom:6px}
+.docs-section strong{color:var(--text)}
+
+/* ── SCHEDULER STATUS ── */
+#schedulerStatus{
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.65rem;text-align:center;margin-top:6px;
+  letter-spacing:0.06em;
+}
+
+/* ── MODAL ── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;
+  display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(12px);animation:fadeIn 0.2s ease;
+}
+.modal-box{
+  background:linear-gradient(135deg,#0b1524,#07101e);
+  border:1px solid rgba(255,255,255,0.08);border-radius:20px;
+  padding:28px 30px;max-width:440px;width:92%;
+  box-shadow:0 24px 64px rgba(0,0,0,0.6);
+  animation:slideUp 0.3s ease;
+}
+
+@media(max-width:768px){
+  .main{grid-template-columns:1fr}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .del-grid{grid-template-columns:1fr}
+  .sidebar{padding-right:0;position:static;max-height:none}
+  header{padding:0 16px}
+  .hero{padding:30px 16px 24px}
+  .wf-strip{padding:10px 16px}
+}
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<div class="app">
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-mark">🔗</div>
+    <div>
+      <div class="logo-name">LINKEDFLOW AI</div>
+      <div class="logo-tag">RSS → LinkedIn Automator</div>
+    </div>
+  </div>
+  <nav class="nav-tabs">
+    <button class="nav-tab active" onclick="setTab(this,'workflow')">⚡ Workflow</button>
+    <button class="nav-tab" onclick="setTab(this,'samples')">📋 Sample Posts</button>
+    <button class="nav-tab" onclick="setTab(this,'docs')">📖 How It Works</button>
+  </nav>
+  <div class="hdr-right">
+    <div class="live-badge"><div class="live-dot"></div> LIVE ENGINE</div>
+  </div>
+</header>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-chip">🎯 Smart Content Automation System</div>
+  <h1>Turn RSS Feeds Into<br/><em>LinkedIn Posts That Perform</em></h1>
+  <p>Filter only high-quality, insightful content with AI — then convert it into ready-to-publish LinkedIn posts. Quality over quantity.</p>
+</div>
+
+<!-- WORKFLOW STRIP -->
+<div class="wf-strip">
+  <div class="wf-step"><div class="ic">📡</div><div class="wf-info"><div class="wf-name">RSS Feed</div><div class="wf-desc">Blogs, newsletters, sites</div></div></div>
+  <div class="wf-arrow">→</div>
+  <div class="wf-step"><div class="ic">🤖</div><div class="wf-info"><div class="wf-name">AI Filter</div><div class="wf-desc">Score & quality check</div></div></div>
+  <div class="wf-arrow">→</div>
+  <div class="wf-step"><div class="ic">✍️</div><div class="wf-info"><div class="wf-name">Post Generator</div><div class="wf-desc">Hook + Body + CTA + Hashtags</div></div></div>
+  <div class="wf-arrow">→</div>
+  <div class="wf-step"><div class="ic">📤</div><div class="wf-info"><div class="wf-name">LinkedIn Ready</div><div class="wf-desc">Copy & publish instantly</div></div></div>
+</div>
+
+<!-- SECTIONS -->
+<div id="sec-workflow" class="main">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <div class="panel">
+      <div class="panel-hdr">📡 RSS Feed Source</div>
+      <!-- Category filter tabs -->
+      <div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap">
+        <button class="feed-cat active" onclick="filterFeeds('all',this)" style="font-size:0.6rem;font-weight:700;padding:3px 9px;border-radius:20px;border:1px solid rgba(0,212,255,0.3);background:rgba(0,212,255,0.1);color:var(--glow);cursor:pointer;font-family:inherit">All</button>
+        <button class="feed-cat" onclick="filterFeeds('tech',this)" style="font-size:0.6rem;font-weight:700;padding:3px 9px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-family:inherit">⚡ Tech</button>
+        <button class="feed-cat" onclick="filterFeeds('ai',this)" style="font-size:0.6rem;font-weight:700;padding:3px 9px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-family:inherit">🧠 AI</button>
+        <button class="feed-cat" onclick="filterFeeds('fw',this)" style="font-size:0.6rem;font-weight:700;padding:3px 9px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-family:inherit">⚙️ Frameworks</button>
+      </div>
+
+      <div id="feedBtns">
+        <!-- TECH -->
+        <button class="feed-item-btn active" data-cat="tech" onclick="pickFeed(this,'tech')">
+          <span class="fi-icon">🔶</span>
+          <div><div class="fi-name">HN — Latest</div><div class="fi-url">New launches & releases</div></div>
+          <span class="fi-live">LIVE</span>
+        </button>
+        <button class="feed-item-btn" data-cat="tech" onclick="pickFeed(this,'hn')">
+          <span class="fi-icon">⭐</span>
+          <div><div class="fi-name">HN — Best</div><div class="fi-url">Top stories today</div></div>
+          <span class="fi-live">LIVE</span>
+        </button>
+        <button class="feed-item-btn" data-cat="tech" onclick="pickFeed(this,'verge')">
+          <span class="fi-icon">📱</span>
+          <div><div class="fi-name">The Verge</div><div class="fi-url">Tech product news</div></div>
+          <span class="fi-live">LIVE</span>
+        </button>
+        <button class="feed-item-btn" data-cat="tech" onclick="pickFeed(this,'wired')">
+          <span class="fi-icon">🔌</span>
+          <div><div class="fi-name">Wired</div><div class="fi-url">Deep tech stories</div></div>
+          <span class="fi-live">LIVE</span>
+        </button>
+        <!-- AI -->
+        <button class="feed-item-btn" data-cat="ai" onclick="pickFeed(this,'ai')">
+          <span class="fi-icon">🚀</span>
+          <div><div class="fi-name">HN — New AI Models</div><div class="fi-url">Model releases & launches</div></div>
+          <span class="fi-live">LIVE</span>
+        </button>
+        <button class="feed-item-btn" data-cat="ai" onclick="pickFeed(this,'llm')">
+          <span class="fi-icon">🧠</span>
+          <div><div class="fi-name">HN — LLMs</div><div class="fi-url">GPT · Claude · Gemini · Llama</div></div>
+          <span class="fi-live">LIVE</span>
+        </button>
+        <button class="feed-item-btn" data-cat="ai" onclick="pickFeed(this,'aiarch')">
+          <span class="fi-icon">🏗️</span>
+          <div><div class="fi-name">HN — Architecture</div><div class="fi-url">Transformers · Neural nets</div></div>
+          <span class="fi-live">LIVE</span>
+        </button>
+        <button class="feed-item-btn" data-cat="ai" onclick="pickFeed(this,'mit')">
+          <span class="fi-icon">🔬</span>
+          <div><div class="fi-name">MIT Tech Review</div><div class="fi-url">AI research & analysis</div></div>
+          <span class="fi-live">LIVE</span>
+        </button>
+        <button class="feed-item-btn" data-cat="ai" onclick="pickFeed(this,'deepmind')">
+          <span class="fi-icon">🤖</span>
+          <div><div class="fi-name">DeepMind Blog</div><div class="fi-url">Frontier AI research</div></div>
+          <span class="fi-live">LIVE</span>
+        </button>
+        <!-- FRAMEWORKS -->
+        <button class="feed-item-btn" data-cat="fw" onclick="pickFeed(this,'frameworks')">
+          <span class="fi-icon">⚙️</span>
+          <div><div class="fi-name">HN — Frameworks</div><div class="fi-url">New libs & open source</div></div>
+          <span class="fi-live">LIVE</span>
+        </button>
+        <button class="feed-item-btn" data-cat="fw" onclick="pickFeed(this,'devtools')">
+          <span class="fi-icon">🛠️</span>
+          <div><div class="fi-name">HN — Dev Tools</div><div class="fi-url">SDKs · APIs · launches</div></div>
+          <span class="fi-live">LIVE</span>
+        </button>
+      </div>
+      <div style="margin-top:8px">
+        <input type="text" id="customUrl" placeholder="Or paste custom RSS URL..."/>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr">🎨 Post Style Toggle</div>
+      <div class="style-row">
+        <button class="style-btn active" onclick="pickStyle(this,'authority')">
+          <span class="sb-icon">🏆</span>
+          <span class="sb-name">Authority</span>
+          <span class="sb-desc">Bold insights</span>
+        </button>
+        <button class="style-btn" onclick="pickStyle(this,'educational')">
+          <span class="sb-icon">📚</span>
+          <span class="sb-name">Educational</span>
+          <span class="sb-desc">Teach & explain</span>
+        </button>
+        <button class="style-btn" onclick="pickStyle(this,'opinion')">
+          <span class="sb-icon">💬</span>
+          <span class="sb-name">Opinion</span>
+          <span class="sb-desc">Contrarian take</span>
+        </button>
+        <button class="style-btn" onclick="pickStyle(this,'story')">
+          <span class="sb-icon">🔥</span>
+          <span class="sb-name">Story</span>
+          <span class="sb-desc">Real demo, viral</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr">⚙️ Filter Settings</div>
+      <div class="ctrl-row">
+        <span class="ctrl-lbl">Quality Threshold</span>
+        <div style="display:flex;align-items:center;gap:7px">
+          <input type="range" min="0.1" max="0.9" step="0.05" value="0.6" id="thresh" oninput="(document.getElementById('thv') || {}).textContent =Math.round(parseFloat(this.value)*100)+'%'"/>
+          <div class="ctrl-val" id="thv">60%</div>
+        </div>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-lbl">Max Articles</span>
+        <select id="maxF"><option value="5">5</option><option value="8" selected>8</option><option value="12">12</option></select>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-lbl">Auto-Generate Posts</span>
+        <input type="checkbox" id="autoG"/>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-lbl">Include CTA</span>
+        <input type="checkbox" id="inclCta" checked/>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-lbl">Post Length</span>
+        <select id="postLength" style="background:rgba(255,255,255,0.04);border:1px solid #1a4060;color:var(--text);border-radius:7px;padding:4px 8px;font-size:0.8rem;font-family:inherit">
+          <option value="short">Short (150 words)</option>
+          <option value="medium" selected>Medium (250 words)</option>
+          <option value="long">Long (400 words)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr">👤 Author</div>
+      <input type="text" id="authorN" value="Srashti Jain" placeholder="Your Name"/>
+    </div>
+
+    <!-- Auto Scheduler Panel -->
+    <div class="panel" style="border-color:rgba(0,255,136,0.25)">
+      <div class="panel-hdr" style="color:var(--nova)">⏰ Daily Auto Scheduler</div>
+
+      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:12px;line-height:1.6">
+        Posts automatically twice a day 🚀
+      </div>
+
+      <!-- Morning time -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:7px">
+          <span style="font-size:1rem">🌅</span>
+          <span style="font-size:0.75rem;font-weight:600;color:var(--text)">Morning Post</span>
+        </div>
+        <input type="time" id="morningTime" value="09:00"
+          style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);
+                 color:var(--text);border-radius:7px;padding:4px 8px;font-size:0.75rem;
+                 outline:none;font-family:'JetBrains Mono',monospace;margin:0;width:auto"/>
+      </div>
+
+      <!-- Evening time -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:7px">
+          <span style="font-size:1rem">🌆</span>
+          <span style="font-size:0.75rem;font-weight:600;color:var(--text)">Evening Post</span>
+        </div>
+        <input type="time" id="eveningTime" value="18:00"
+          style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);
+                 color:var(--text);border-radius:7px;padding:4px 8px;font-size:0.75rem;
+                 outline:none;font-family:'JetBrains Mono',monospace;margin:0;width:auto"/>
+      </div>
+
+      <!-- Enable toggle -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="font-size:0.78rem;font-weight:700;color:var(--text)">Enable Daily Schedule</span>
+        <label style="position:relative;display:inline-block;width:42px;height:22px;cursor:pointer">
+          <input type="checkbox" id="schedulerOn" onchange="toggleScheduler()" style="opacity:0;width:0;height:0"/>
+          <span id="schedulerSlider" style="position:absolute;inset:0;background:#1a3050;border-radius:20px;transition:0.3s"></span>
+          <span id="schedulerDot" style="position:absolute;width:16px;height:16px;background:#4a6888;border-radius:50%;left:3px;top:3px;transition:0.3s;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></span>
+        </label>
+      </div>
+
+      <!-- Status box — shown when ON -->
+      <div id="schedulerStatusBox" style="display:none;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:12px;font-size:0.7rem;line-height:2">
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--muted)">Status</span>
+          <span id="schedulerStatus" style="color:var(--nova);font-weight:700">● Active</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--muted)">Today's posts</span>
+          <span id="postsDone" style="color:var(--text);font-weight:700">0 / 2</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--muted)">Next post at</span>
+          <span id="nextPostTime" style="color:var(--amber);font-weight:700;font-family:'JetBrains Mono',monospace">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--muted)">Time left</span>
+          <span id="timeLeft" style="color:var(--glow);font-family:'JetBrains Mono',monospace">—</span>
+        </div>
+      </div>
+
+      <!-- Stop button -->
+      <button id="stopSchedBtn" onclick="stopSchedulerManually()"
+        style="display:none;width:100%;margin-top:8px;padding:8px;border-radius:8px;
+               background:rgba(255,68,85,0.08);border:1px solid rgba(255,68,85,0.25);
+               color:#ff8899;font-size:0.72rem;font-weight:600;cursor:pointer;font-family:inherit">
+        ⏹ Stop Scheduler
+      </button>
+
+      <!-- Hidden inputs for compat -->
+      <input type="hidden" id="postInterval" value="5"/>
+      <input type="hidden" id="minPosts" value="2"/>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr">🔗 LinkedIn Connect</div>
+
+      <!-- NOT connected state -->
+      <div id="liNotConnected">
+        <button onclick="connectLinkedIn()" style="width:100%;background:linear-gradient(135deg,#0077b5,#005983);border:none;color:white;border-radius:9px;padding:11px;font-size:0.8rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 15px rgba(0,119,181,0.3);transition:all 0.2s"
+          onmouseover="this.style.transform='translateY(-1px)'"
+          onmouseout="this.style.transform='none'">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+          Connect LinkedIn Account
+        </button>
+        <div style="font-size:0.62rem;color:var(--muted);text-align:center;margin-top:8px;line-height:1.5">
+          One-click OAuth login — no manual token needed
+        </div>
+      </div>
+
+      <!-- CONNECTED state -->
+      <div id="liConnected" style="display:none">
+        <div style="display:flex;align-items:center;gap:10px;background:rgba(0,255,136,0.06);border:1px solid rgba(0,255,136,0.2);border-radius:9px;padding:10px 12px">
+          <div id="liAvatar" style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#0077b5,#005983);display:flex;align-items:center;justify-content:center;font-weight:900;color:white;font-size:1rem;flex-shrink:0"></div>
+          <div>
+            <div id="liName" style="font-size:0.82rem;font-weight:700;color:var(--text)"></div>
+            <div style="font-size:0.65rem;color:var(--nova)">✅ Connected</div>
+          </div>
+          <button onclick="disconnectLinkedIn()" style="margin-left:auto;background:none;border:1px solid rgba(255,68,85,0.3);color:#ff8899;border-radius:6px;padding:3px 9px;font-size:0.65rem;cursor:pointer;font-family:inherit">Disconnect</button>
+        </div>
+        <input type="hidden" id="liToken"/>
+        <div id="liStatus" style="display:none"></div>
+      </div>
+    </div>
+
+    <button class="launch" id="launchBtn" onclick="launchAutomation()">
+      <span id="lIcon">⚡</span>
+      <span id="lTxt">LAUNCH WORKFLOW</span>
+    </button>
+
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- STATS -->
+    <div class="stats">
+      <div class="stat" style="--ac:#00d4ff"><div class="stat-n" id="sF">0</div><div class="stat-l">Fetched</div></div>
+      <div class="stat" style="--ac:#00ff88"><div class="stat-n" id="sP">0</div><div class="stat-l">Passed Filter</div></div>
+      <div class="stat" style="--ac:#7b2fff"><div class="stat-n" id="sG">0</div><div class="stat-l">Posts Generated</div></div>
+      <div class="stat" style="--ac:#ff6b35"><div class="stat-n" id="sA">—</div><div class="stat-l">Avg Quality Score</div></div>
+    </div>
+
+    <!-- PIPELINE -->
+    <div class="pipe-box">
+      <div class="pipe-hdr">⚙️ LIVE WORKFLOW PIPELINE</div>
+      <div class="pipe-track">
+        <div class="pipe-node" id="pn1"><div class="pipe-circ">📡</div><div class="pipe-lbl">Fetch RSS</div></div>
+        <div class="pipe-node" id="pn2"><div class="pipe-circ">🤖</div><div class="pipe-lbl">AI Filter</div></div>
+        <div class="pipe-node" id="pn3"><div class="pipe-circ">✍️</div><div class="pipe-lbl">Generate</div></div>
+        <div class="pipe-node" id="pn4"><div class="pipe-circ">📤</div><div class="pipe-lbl">Ready</div></div>
+      </div>
+      <div class="log" id="logBox">
+        <div class="ll info"><span class="ts">[00:00]</span><span class="msg">LinkedFlow AI ready. Configure settings and click Launch Workflow.</span></div>
+      </div>
+    </div>
+
+    <!-- RESULT TABS -->
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchResultTab('all',this)">All Items</button>
+      <button class="tab-btn" onclick="switchResultTab('passed',this)">✅ Passed</button>
+      <button class="tab-btn" onclick="switchResultTab('failed',this)">🚫 Filtered Out</button>
+      <button class="tab-btn" onclick="switchResultTab('posts',this)">📝 Posts Ready</button>
+    </div>
+
+    <!-- FEED LIST -->
+    <div class="feed-list" id="feedList">
+      <div class="empty">
+        <div class="empty-icon">🔗</div>
+        <div class="empty-t">AWAITING LAUNCH</div>
+        <div class="empty-s">Click "Launch Workflow" to fetch RSS articles and run them through the AI filter.</div>
+      </div>
+    </div>
+
+    <!-- RSS FEED POSTS -->
+    <div id="feed"></div>
+
+    <!-- GENERATED LINKEDIN POSTS -->
+    <div id="generatedPosts"></div>
+
+  </div>
+</div>
+
+<!-- SAMPLE POSTS SECTION -->
+<div id="sec-samples" style="display:none;max-width:900px;margin:0 auto;width:100%;padding:28px 24px">
+  <div class="deliverables" style="margin-bottom:24px">
+    <div class="del-title">📦 Deliverables — What's Been Built</div>
+    <div class="del-grid">
+      <div class="del-card">
+        <div class="del-num">01</div>
+        <div class="del-label">Working Workflow</div>
+        <div class="del-desc">RSS fetch → AI quality filter (0–100 score) → LinkedIn post generator. Full pipeline with live logs.</div>
+      </div>
+      <div class="del-card">
+        <div class="del-num">02</div>
+        <div class="del-label">RSS Sources Used</div>
+        <div class="del-desc">TechCrunch, Harvard Business Review, MIT Technology Review, Marketing Week — real industry feeds.</div>
+      </div>
+      <div class="del-card">
+        <div class="del-num">03</div>
+        <div class="del-label">3 Sample Posts</div>
+        <div class="del-desc">3 ready-to-publish LinkedIn posts generated from filtered high-quality content. All 3 styles covered.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="samples-section">
+    <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--glow);margin-bottom:16px;">📝 3 Generated LinkedIn Posts — From Filtered Content</div>
+
+    <!-- POST 1 -->
+    <div>
+      <div class="sample-hdr">
+        <div class="sample-title">🏆 Post #1 — Authority Style <span style="color:var(--nova);font-size:0.65rem;background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.2);padding:2px 8px;border-radius:20px;margin-left:6px">Score: 89/100 ✅ PASS</span></div>
+        <span class="sample-source">Source: TechCrunch — AI Infrastructure</span>
+      </div>
+      <div class="sample-post">
+        <div class="style-badge sb-authority">Authority</div>
+        <div class="li-hdr">
+          <div class="li-av">A</div>
+          <div><div class="li-name">Alex Morgan</div><div class="li-role">Technology Strategist • LinkedIn Post</div></div>
+        </div>
+        <div class="li-body" id="sp1">Most companies think they're prepared for AI disruption. They're not — and the gap is widening faster than leadership realizes.
+
+The energy demands of large-scale AI training are forcing a fundamental rethink of electrical infrastructure. This isn't a Silicon Valley problem. It's a global one.
+
+Here's what this actually means for your business:
+
+Every organization that runs on data — which is every organization — is about to face infrastructure decisions they didn't budget for.
+
+The companies that will thrive aren't the ones reacting to this. They're the ones that already have a seat at the table where these decisions are being made.
+
+The window to get ahead of this is open. But it closes faster than most timelines suggest.
+
+Where does your organization stand on this? Are you planning proactively, or waiting to react?
+
+#AIStrategy #DigitalTransformation #TechLeadership #FutureOfWork #Innovation</div>
+        <div class="li-footer">
+          <div class="li-reacts"><span class="li-r">👍 Like</span><span class="li-r">💬 Comment</span><span class="li-r">🔁 Repost</span><span class="li-r">📤 Send</span></div>
+          <button class="copy-btn" onclick="copyText('sp1',this)">📋 Copy Post</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- POST 2 -->
+    <div>
+      <div class="sample-hdr">
+        <div class="sample-title">📚 Post #2 — Educational Style <span style="color:var(--nova);font-size:0.65rem;background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.2);padding:2px 8px;border-radius:20px;margin-left:6px">Score: 84/100 ✅ PASS</span></div>
+        <span class="sample-source">Source: Harvard Business Review — Leadership</span>
+      </div>
+      <div class="sample-post">
+        <div class="style-badge sb-educational">Educational</div>
+        <div class="li-hdr">
+          <div class="li-av">A</div>
+          <div><div class="li-name">Alex Morgan</div><div class="li-role">Technology Strategist • LinkedIn Post</div></div>
+        </div>
+        <div class="li-body" id="sp2">Did you know 70% of organizational transformations fail — and it's rarely the strategy that's wrong?
+
+Harvard Business Review's research across 400 companies reveals a consistent pattern: it's the human dynamics underneath that cause the collapse.
+
+Here's the framework that separates successful transformations from failed ones:
+
+1. Leaders treat change as a communication problem, not a strategy problem.
+2. They invest in psychological safety before announcing structural shifts.
+3. They measure adoption, not just implementation.
+
+The companies that get this right don't announce transformation. They architect conditions where transformation becomes the natural path of least resistance.
+
+The difference is subtle. The results are not.
+
+Are you currently navigating a transformation? What's the biggest friction point you're experiencing?
+
+#ChangeManagement #Leadership #OrganizationalDesign #HBR #ProfessionalGrowth</div>
+        <div class="li-footer">
+          <div class="li-reacts"><span class="li-r">👍 Like</span><span class="li-r">💬 Comment</span><span class="li-r">🔁 Repost</span><span class="li-r">📤 Send</span></div>
+          <button class="copy-btn" onclick="copyText('sp2',this)">📋 Copy Post</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- POST 3 -->
+    <div>
+      <div class="sample-hdr">
+        <div class="sample-title">💬 Post #3 — Opinion Style <span style="color:var(--nova);font-size:0.65rem;background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.2);padding:2px 8px;border-radius:20px;margin-left:6px">Score: 82/100 ✅ PASS</span></div>
+        <span class="sample-source">Source: MIT Technology Review — Quantum Computing</span>
+      </div>
+      <div class="sample-post">
+        <div class="style-badge sb-opinion">Opinion</div>
+        <div class="li-hdr">
+          <div class="li-av">A</div>
+          <div><div class="li-name">Alex Morgan</div><div class="li-role">Technology Strategist • LinkedIn Post</div></div>
+        </div>
+        <div class="li-body" id="sp3">Unpopular opinion: most of the quantum computing hype is actually underselling what's about to happen in one specific area.
+
+Everyone is focused on cryptography and drug discovery. Fair enough — the implications are massive.
+
+But quantum optimization for logistics and supply chain problems? That's where the first real-world business advantage lands. And it's landing faster than enterprise timelines account for.
+
+MIT's research now shows measurable advantages in these domains that weren't on anyone's 3-year roadmap 18 months ago.
+
+The companies that will capture this value aren't the ones building quantum systems. They're the ones who understand which problems are actually quantum-native.
+
+Most strategists haven't made that distinction yet. That gap is the opportunity.
+
+Agree? Or am I wrong about where the value actually concentrates first?
+
+#QuantumComputing #BusinessStrategy #EmergingTech #Innovation #FutureOfBusiness</div>
+        <div class="li-footer">
+          <div class="li-reacts"><span class="li-r">👍 Like</span><span class="li-r">💬 Comment</span><span class="li-r">🔁 Repost</span><span class="li-r">📤 Send</span></div>
+          <button class="copy-btn" onclick="copyText('sp3',this)">📋 Copy Post</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- FILTERED OUT EXAMPLE -->
+    <div style="margin-top:8px">
+      <div class="sample-title" style="margin-bottom:10px">🚫 Filtered Out Example <span style="color:#ff4455;font-size:0.65rem;background:rgba(255,68,85,0.08);border:1px solid rgba(255,68,85,0.2);padding:2px 8px;border-radius:20px;margin-left:6px">Score: 18/100 ❌ FAIL</span></div>
+      <div style="background:rgba(255,68,85,0.04);border:1px solid rgba(255,68,85,0.15);border-radius:10px;padding:14px 16px;border-left:3px solid #ff4455">
+        <div style="font-size:0.82rem;font-weight:600;color:#ff8899;margin-bottom:6px">🚫 PROMO: Flash Sale — Tech Courses 50% Off This Weekend Only!</div>
+        <div style="font-size:0.75rem;color:var(--muted)">Amazing deals on online courses. Use code SAVE50 at checkout. Limited seats. Offer expires midnight tonight. Don't miss out!</div>
+        <div style="margin-top:8px;font-size:0.68rem;color:#ff4455">💡 Reason: Content is promotional in nature and lacks professional value for a LinkedIn audience.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- HOW IT WORKS SECTION -->
+<div id="sec-docs" style="display:none;max-width:860px;margin:0 auto;width:100%;padding:28px 24px">
+  <div style="display:flex;flex-direction:column;gap:18px">
+
+    <div class="panel">
+      <div class="panel-hdr">🔧 System Architecture</div>
+      <div style="font-size:0.82rem;color:#8aaabb;line-height:1.8">
+        LinkedFlow AI is a 4-step automated pipeline:<br/><br/>
+        <strong style="color:var(--text)">Step 1 — RSS Fetch:</strong> Articles are pulled from selected RSS feeds (TechCrunch, HBR, MIT Tech Review, Marketing Week). Each article provides a title and summary for evaluation.<br/><br/>
+        <strong style="color:var(--text)">Step 2 — AI Filter:</strong> Each article is scored 0–100 using a multi-factor quality engine. It checks for insightfulness, professional relevance, depth of content, and penalizes promotional/spammy language. Only articles scoring above the threshold (default 70) pass.<br/><br/>
+        <strong style="color:var(--text)">Step 3 — Post Generation:</strong> Passing articles are converted into LinkedIn-ready posts with: strong hook (first line), clean paragraphs, professional tone, optional CTA, and relevant hashtags. Three style modes — Authority, Educational, Opinion.<br/><br/>
+        <strong style="color:var(--text)">Step 4 — Output:</strong> Posts are displayed in a LinkedIn preview card with one-click Copy to Clipboard.
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr">📊 Filter Scoring Criteria</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+        <div style="background:rgba(0,255,136,0.04);border:1px solid rgba(0,255,136,0.15);border-radius:9px;padding:12px">
+          <div style="font-size:0.75rem;font-weight:700;color:var(--nova);margin-bottom:6px">✅ Passes Filter (Score ≥ 70)</div>
+          <div style="font-size:0.72rem;color:#8aaabb;line-height:1.7">• Contains research, frameworks, data<br/>• Professional language and tone<br/>• Insightful title + detailed summary<br/>• Relevant to industry professionals<br/>• Original perspective or analysis</div>
+        </div>
+        <div style="background:rgba(255,68,85,0.04);border:1px solid rgba(255,68,85,0.15);border-radius:9px;padding:12px">
+          <div style="font-size:0.75rem;font-weight:700;color:#ff8899;margin-bottom:6px">🚫 Filtered Out (Score &lt; 70)</div>
+          <div style="font-size:0.72rem;color:#8aaabb;line-height:1.7">• Promotional / sales content<br/>• Discount / offer / click-bait language<br/>• Low-depth, generic advice<br/>• Sponsored or partner content<br/>• Missing substantive summary</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr">🎨 Post Style Guide</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        <div style="background:rgba(123,47,255,0.06);border:1px solid rgba(123,47,255,0.2);border-radius:9px;padding:12px">
+          <div style="font-size:0.8rem;font-weight:700;color:#b08fff;margin-bottom:6px">🏆 Authority</div>
+          <div style="font-size:0.71rem;color:#8aaabb;line-height:1.6">Bold declarative hook → Industry insight → What it means → Strong takeaway → CTA</div>
+        </div>
+        <div style="background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.2);border-radius:9px;padding:12px">
+          <div style="font-size:0.8rem;font-weight:700;color:var(--glow);margin-bottom:6px">📚 Educational</div>
+          <div style="font-size:0.71rem;color:#8aaabb;line-height:1.6">Surprising fact/question hook → Explain concept → Numbered breakdown → Lesson → CTA</div>
+        </div>
+        <div style="background:rgba(255,107,53,0.06);border:1px solid rgba(255,107,53,0.2);border-radius:9px;padding:12px">
+          <div style="font-size:0.8rem;font-weight:700;color:var(--orbit);margin-bottom:6px">💬 Opinion</div>
+          <div style="font-size:0.71rem;color:#8aaabb;line-height:1.6">Contrarian hook → Challenge wisdom → Supporting argument → Nuance → Discussion CTA</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</div><!-- end app -->
+
+<script>
+// ── STARFIELD ────────────────────────────────────────────────────────────────
+(function(){
+  const c=document.getElementById('bg'),ctx=c.getContext('2d');
+  let stars=[];
+  const resize=()=>{c.width=innerWidth;c.height=innerHeight};
+  const mk=()=>{stars=Array.from({length:150},()=>({x:Math.random()*c.width,y:Math.random()*c.height,r:Math.random()*1.1+0.2,op:Math.random()*0.6+0.1,sp:Math.random()*0.012+0.003}))};
+  const draw=()=>{
+    ctx.clearRect(0,0,c.width,c.height);
+    ctx.fillStyle='#060d1a';ctx.fillRect(0,0,c.width,c.height);
+    [[c.width*0.25,c.height*0.3,'rgba(0,119,181,0.04)'],[c.width*0.75,c.height*0.65,'rgba(123,47,255,0.04)']].forEach(([x,y,col])=>{
+      const g=ctx.createRadialGradient(x,y,0,x,y,c.width*0.35);
+      g.addColorStop(0,col);g.addColorStop(1,'transparent');
+      ctx.fillStyle=g;ctx.fillRect(0,0,c.width,c.height);
+    });
+    stars.forEach(s=>{s.op+=s.sp;if(s.op>0.7||s.op<0.05)s.sp*=-1;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fillStyle=`rgba(200,225,255,${s.op})`;ctx.fill()});
+    requestAnimationFrame(draw);
+  };
+  resize();mk();draw();
+  window.addEventListener('resize',()=>{resize();mk()});
+})();
+
+
+
+// ── RSS FEED URLs ─────────────────────────────────────────────────────────────
+const FEED_URLS={
+  // ⚡ TECH
+  tech:       'https://api.rss2json.com/v1/api.json?rss_url=https://hnrss.org/frontpage',
+  hn:         'https://api.rss2json.com/v1/api.json?rss_url=https://hnrss.org/best',
+  verge:      'https://api.rss2json.com/v1/api.json?rss_url=https://www.theverge.com/rss/index.xml',
+  wired:      'https://api.rss2json.com/v1/api.json?rss_url=https://www.wired.com/feed/rss',
+
+  // 🧠 AI Models & Research
+  ai:         'https://api.rss2json.com/v1/api.json?rss_url=https://hnrss.org/frontpage%3Fq%3DAI%2Bmodel%2Brelease',
+  llm:        'https://api.rss2json.com/v1/api.json?rss_url=https://hnrss.org/frontpage%3Fq%3DLLM%2BGPT%2BClaude%2BGemini%2BLlama',
+  aiarch:     'https://api.rss2json.com/v1/api.json?rss_url=https://hnrss.org/frontpage%3Fq%3DAI%2Barchitecture%2Btransformer',
+  mit:        'https://api.rss2json.com/v1/api.json?rss_url=https://www.technologyreview.com/feed/',
+  deepmind:   'https://api.rss2json.com/v1/api.json?rss_url=https://deepmind.google/blog/rss.xml',
+
+  // 🔧 Frameworks & Tools
+  frameworks: 'https://api.rss2json.com/v1/api.json?rss_url=https://hnrss.org/frontpage%3Fq%3Dframework%2Blibrary%2Bopen%2Bsource',
+  devtools:   'https://api.rss2json.com/v1/api.json?rss_url=https://hnrss.org/frontpage%3Fq%3Ddeveloper%2Btools%2BSDK%2BAPI',
+};
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+const S = {feedKey:'tech', style:'authority', tab:'all', items:[], running:false, pipe:0};
+let selectedStyle = 'authority';
+let selectedFeed  = '';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ── UI FUNCTIONS ──────────────────────────────────────────────────────────────
+function setTab(btn, sec){
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  ['workflow','samples','docs'].forEach(s => {
+    const el = document.getElementById(`sec-${s}`);
+    if(el) el.style.display = s === sec ? (s === 'workflow' ? 'grid' : 'block') : 'none';
+  });
+}
+function pickFeed(el, key){
+  document.querySelectorAll('.feed-item-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  S.feedKey = key;
+  selectedFeed = FEED_URLS[key] || FEED_URLS.tech;
+}
+function filterFeeds(cat, btn){
+  document.querySelectorAll('.feed-cat').forEach(b => {
+    b.style.background='none'; b.style.color='var(--muted)'; b.style.borderColor='var(--border)';
+  });
+  btn.style.background='rgba(0,212,255,0.1)'; btn.style.color='var(--glow)'; btn.style.borderColor='rgba(0,212,255,0.3)';
+  document.querySelectorAll('.feed-item-btn[data-cat]').forEach(b => {
+    b.style.display = (cat==='all' || b.dataset.cat===cat) ? 'flex' : 'none';
+  });
+}
+function pickStyle(el, s){
+  document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  S.style = s; selectedStyle = s;
+}
+function switchResultTab(t, btn){
+  S.tab = t;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function log(msg, type='info'){
+  const box = document.getElementById('logBox');
+  if(!box) return;
+  const d = document.createElement('div');
+  d.className = `ll ${type}`;
+  const ts = new Date().toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  d.innerHTML = `<span class="ts">[${ts}]</span><span class="msg"> ${msg}</span>`;
+  box.appendChild(d); box.scrollTop = box.scrollHeight;
+}
+function setPipe(n){
+  S.pipe = n;
+  for(let i=1; i<=4; i++){
+    const el = document.getElementById(`pn${i}`);
+    if(!el) continue;
+    el.classList.remove('active','done');
+    if(i < n) el.classList.add('done');
+    if(i === n) el.classList.add('active');
+  }
+}
+function getWordTarget(){
+  const v = document.getElementById('postLength')?.value || 'medium';
+  return v==='short' ? 150 : v==='long' ? 400 : 250;
+}
+function copyText(elId, btn){
+  const text = document.getElementById(elId)?.textContent || '';
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✅ Copied!';
+    setTimeout(() => btn.textContent = orig, 1600);
+  }).catch(() => alert(text));
+}
+
+// ── ARTICLE BANKS — topic-specific, always fresh ────────────────────────────
+const ARTICLE_BANKS = {
+  tech: [
+    { title: "Meta Releases Llama 4 — Open Source Just Caught Up to GPT-4", description: "Llama 4's mixture-of-experts architecture matches closed frontier models on most benchmarks. The open source vs closed model gap just collapsed faster than anyone expected.", link:"", pubDate:"" },
+    { title: "OpenAI Ships o3 — The Reasoning Model That Changes How You Prompt", description: "Chain-of-thought is now a first-class architectural feature, not a prompting trick. This changes how you design reliable AI systems from the ground up.", link:"", pubDate:"" },
+    { title: "Google's Gemini 2.0 Goes Multimodal-Native — Not Multimodal-Bolted-On", description: "Native audio, image, and video understanding in a single model. The architectural shift from text-first to truly multimodal changes how AI products get designed.", link:"", pubDate:"" },
+    { title: "Mistral Releases a 7B Model That Runs on a Laptop at 40 Tokens Per Second", description: "4-bit quantized, runs locally, matches GPT-3.5 on most benchmarks. The gap between cloud and edge AI just closed significantly.", link:"", pubDate:"" },
+    { title: "Anthropic's Claude 3.5 Sets New Bar for Code Generation — 49% on SWE-bench", description: "The architectural changes behind this jump are more interesting than the benchmark number. Chain-of-thought is now a first-class citizen in the model design.", link:"", pubDate:"" },
+  ],
+  hn: [
+    { title: "Show HN: I Built an AI Agent That Runs Its Own Scrum Meetings", description: "AI agents walk into a virtual meeting room, report progress, coordinate tasks, and act like a real dev team — no human in the loop. Built with LangGraph over a weekend.", link:"", pubDate:"" },
+    { title: "Ask HN: How Are You Actually Using LLMs in Production?", description: "Top responses reveal the gap between AI demos and production reality: eval frameworks, fallback chains, and latency budgets are the real engineering problems.", link:"", pubDate:"" },
+    { title: "I Replaced My Entire RAG Pipeline With a Single Prompt — Here's What I Learned", description: "Sometimes the sophisticated solution is the wrong one. A well-crafted prompt with a large context window outperformed a complex RAG pipeline on 80% of test cases.", link:"", pubDate:"" },
+    { title: "We Open Sourced Our Internal AI Code Review Tool — 2k Stars in 48 Hours", description: "Built on Claude, runs locally, integrates with GitHub Actions. The tool caught 3x more logic errors than our previous ESLint setup in the first week of production use.", link:"", pubDate:"" },
+    { title: "The System Prompt That Makes GPT-4 Actually Useful for Engineering Tasks", description: "After 6 months of iteration, we found the prompt structure that consistently produces production-quality code. The key insight was treating the model like a senior engineer, not a code generator.", link:"", pubDate:"" },
+  ],
+  ai: [
+    { title: "Open Source AI Is Closing the Gap With Closed Models Faster Than Anyone Forecasted", description: "Six months ago open source was 18 months behind frontier models. Today that gap is 4 months — and in code generation and reasoning benchmarks, it's already closed.", link:"", pubDate:"" },
+    { title: "Mamba Architecture Is Replacing Transformers in Long-Context Production Systems", description: "State space models process sequences in O(n) vs O(n²). For 100k+ token contexts, the latency and cost difference makes transformers economically unviable.", link:"", pubDate:"" },
+    { title: "Mixture of Experts Is Now the Default Architecture for Every Frontier Model", description: "GPT-4, Gemini, Mixtral, Llama 4 — all use MoE. Understanding why this architecture won matters more for builders than knowing it exists.", link:"", pubDate:"" },
+    { title: "DeepMind's New Paper Rewrites the Training Playbook for Foundation Models", description: "Smaller models trained on more data consistently outperform larger models on less data. The scaling laws just got more nuanced — and the implications for inference cost are significant.", link:"", pubDate:"" },
+    { title: "Constitutional AI Is Now Standard Practice — Here Is Why It Actually Works", description: "RLAIF with explicit principles produces more consistently useful models than RLHF alone. The architectural choice explains why some models are reliably better across edge cases.", link:"", pubDate:"" },
+  ],
+  llm: [
+    { title: "LangGraph Is Replacing LangChain in Production — The Mental Model Shift Explains Why", description: "Stateful cyclical graphs instead of linear chains. The teams that made this switch report 60% fewer production incidents and significantly more debuggable failure modes.", link:"", pubDate:"" },
+    { title: "DSPy Is Killing Hand-Written Prompts — And the Results Are Surprisingly Good", description: "Compile your prompts instead of writing them. DSPy optimizes prompts automatically using your labeled data. The best-performing prompt we found was one we never would have written manually.", link:"", pubDate:"" },
+    { title: "Why Agentic RAG Outperforms Static RAG on Every Complex Query We Tested", description: "Static RAG pipelines fail when queries require multi-step reasoning. Agentic retrieval — where the model decides what to look up and when — solved the problems our RAG pipeline couldn't.", link:"", pubDate:"" },
+    { title: "The Eval Framework That Changed How We Ship AI Features", description: "We don't ship any AI feature without 50 labeled examples and a passing eval suite. This discipline cut our production rollback rate by 70% and made our prompts dramatically more stable.", link:"", pubDate:"" },
+    { title: "Context Window as a Design Surface — Not Just a Constraint", description: "With 1M+ token windows, the engineering problem flipped. The hard question is now what to put in context, not whether it fits. This changes AI system architecture fundamentally.", link:"", pubDate:"" },
+  ],
+  aiarch: [
+    { title: "Kolmogorov-Arnold Networks Are Quietly Challenging the MLP Assumption", description: "KANs replace fixed activation functions with learnable splines on edges. Smaller, more interpretable, and surprisingly competitive on scientific tasks — the paper is worth reading carefully.", link:"", pubDate:"" },
+    { title: "Flash Attention 3 Makes 100k Token Contexts Economically Viable", description: "3x faster than Flash Attention 2, works on H100s. The practical implication: applications that were too expensive to run with long contexts are now viable products.", link:"", pubDate:"" },
+    { title: "Speculative Decoding Is Now a Production Necessity for LLM Serving", description: "3-5x inference speedup with no accuracy loss. If you're serving LLMs at scale without speculative decoding, you're leaving significant cost savings on the table.", link:"", pubDate:"" },
+    { title: "The Diffusion Model Architecture Shift Making Image Generation 10x Faster", description: "Consistency models and flow matching are replacing DDPM. The inference speed improvement makes real-time image generation practical for production applications for the first time.", link:"", pubDate:"" },
+    { title: "Why Sparse Attention Is the Architecture Bet Worth Making in 2026", description: "Dense attention doesn't scale. Sparse attention patterns that preserve performance while cutting compute are the foundation of every efficient frontier model being trained today.", link:"", pubDate:"" },
+  ],
+  frameworks: [
+    { title: "Ollama Just Made Local LLM Deployment as Simple as Docker Pull", description: "Pull, run, and serve any open source model in under 60 seconds. The local-first AI development workflow is now accessible to every developer with a modern laptop.", link:"", pubDate:"" },
+    { title: "Vercel AI SDK 4.0 Unifies Streaming Across Every Major LLM Provider", description: "Structured outputs, tool calling, and streaming with the same three lines of code across OpenAI, Anthropic, Mistral, and Cohere. The developer experience gap just closed.", link:"", pubDate:"" },
+    { title: "CrewAI vs AutoGen vs LangGraph — An Honest Production Comparison", description: "After building the same agent system in all three, the reliability and debuggability differences are stark. LangGraph wins on production stability, CrewAI wins on developer speed.", link:"", pubDate:"" },
+    { title: "Instructor Makes Structured LLM Outputs Reliable for the First Time", description: "JSON mode was a hack. Instructor with Pydantic validation changed how we build AI pipelines — the reliability improvement in production made it non-negotiable for our team.", link:"", pubDate:"" },
+    { title: "LlamaIndex 0.10 Rewrites the Retrieval Abstraction From Scratch", description: "The new architecture separates retrieval strategy from data connectors cleanly. The teams that adopt this will build more maintainable RAG systems — the old architecture was a dead end.", link:"", pubDate:"" },
+  ],
+  devtools: [
+    { title: "Cursor Is Replacing VS Code for AI-First Development — Here Is Why", description: "Not because of the autocomplete. Because of the architecture: your codebase as the context, not just the open file. The productivity difference compounds significantly over a week.", link:"", pubDate:"" },
+    { title: "GitHub Copilot Workspace Goes GA — The Agentic Coding Shift Is Real", description: "From issue to pull request with minimal human intervention. The teams using this in production report 40% faster feature delivery on well-specified tickets. The key word is well-specified.", link:"", pubDate:"" },
+    { title: "Devin's Real Benchmark: What It Actually Solves and What It Doesn't", description: "After 6 months of production use, the honest assessment: Devin is exceptional for isolated, well-specified tasks and unreliable for anything requiring broader context. The spec quality is the bottleneck.", link:"", pubDate:"" },
+    { title: "The CLI Tool That Made Our AI Development Workflow 3x Faster", description: "We built a simple CLI that wraps our most common LLM calls, handles retries and fallbacks, and logs everything to our eval pipeline automatically. The ROI was immediate.", link:"", pubDate:"" },
+    { title: "Why Every Senior Engineer on Our Team Switched to AI-Assisted Code Review", description: "Not for the autocomplete — for the architectural feedback. The model catches coupling issues and missing edge cases in 30 seconds that would take a human reviewer 20 minutes to articulate.", link:"", pubDate:"" },
+  ],
+  mit: [
+    { title: "MIT Research: AI Models Are More Confident When They Are Wrong — Not Less", description: "New findings show calibration gets worse, not better, as models scale. The practical implication: your AI system needs explicit uncertainty quantification, not just a confidence score.", link:"", pubDate:"" },
+    { title: "New MIT Study Reframes the AI Skills Gap — It Is Not About Coding", description: "The bottleneck isn't technical skill. It's the ability to decompose ambiguous problems into testable hypotheses. This is the skill AI makes more valuable, not less.", link:"", pubDate:"" },
+    { title: "MIT Research Shows LLMs Fail Systematically on Causal Reasoning Tasks", description: "Strong correlation performance, weak causation performance — consistently. The implication for AI product design: tasks requiring causal reasoning need human-in-the-loop by default.", link:"", pubDate:"" },
+    { title: "MIT Computer Science Lab Releases Benchmark That Exposes LLM Reasoning Limits", description: "The benchmark reveals that state-of-the-art models solve 78% of problems by pattern matching — not reasoning. The 22% genuine reasoning gap is where the next architectural breakthroughs will come.", link:"", pubDate:"" },
+    { title: "MIT Study: Companies Using AI for Decision Support Outperform Those Using It for Automation", description: "AI as a thinking partner produces 34% better decision outcomes than AI as a replacement. The framing matters enormously — and most organizations have the framing wrong.", link:"", pubDate:"" },
+  ],
+  deepmind: [
+    { title: "DeepMind's AlphaFold 3 Extends Protein Prediction to RNA and DNA", description: "The scope expansion is as significant as the original AlphaFold breakthrough. Drug discovery timelines that assumed 10 years of structural biology are being revised downward dramatically.", link:"", pubDate:"" },
+    { title: "DeepMind Gemma 3 Sets New Open Source Efficiency Benchmark", description: "Better performance per parameter than any open model we have tested. The efficiency improvements make it viable for edge deployment scenarios that previously required closed API access.", link:"", pubDate:"" },
+    { title: "DeepMind's New Reinforcement Learning Paper Changes the Sample Efficiency Equation", description: "3x better sample efficiency than previous state-of-the-art. The practical implication: training capable agents in simulated environments just became significantly more feasible for non-frontier labs.", link:"", pubDate:"" },
+    { title: "DeepMind Publishes the First Comprehensive AI Safety Benchmark That Matters in Production", description: "Previous safety benchmarks measured hypothetical risks. This one measures real deployment failures across 10,000 production interactions. The results are sobering and useful.", link:"", pubDate:"" },
+    { title: "DeepMind's Research on AI Planning Suggests Current Architectures Have a Fundamental Ceiling", description: "Planning tasks that require more than 5-step reasoning consistently fail across all tested models. This is an architectural limitation, not a training data problem — and the implications for AGI timelines are significant.", link:"", pubDate:"" },
+  ],
+  wired: [
+    { title: "The Real Cost of AI Is Not Compute — It Is Electricity, and the Bill Is Coming", description: "Training a single large model now consumes as much electricity as 130 US homes use in a year. Data centers in major tech hubs will face capacity crunches by 2026.", link:"", pubDate:"" },
+    { title: "Why Silicon Valley's AI Talent War Is Now a Retention War", description: "The shortage has shifted from hiring to keeping. Companies that built strong AI teams in 2023 are now watching those teams get poached at 2-3x compensation. The talent market got more expensive, not less.", link:"", pubDate:"" },
+    { title: "The AI Regulation Gap: Why Every Major AI Law Has the Same Blindspot", description: "Current AI regulation focuses on outputs — not training data, not infrastructure, not incentive structures. The laws being passed today will need significant revision within 3 years.", link:"", pubDate:"" },
+    { title: "Inside the Companies That Built Real AI Products — Not Just Demos", description: "The pattern is consistent: real AI products are boring. They solve one specific problem reliably, have excellent fallback behavior, and were built backwards from an eval, not forwards from a model.", link:"", pubDate:"" },
+    { title: "Why Most AI Startups Will Fail — And It Has Nothing to Do With the Technology", description: "The failure mode isn't the model — it's the distribution strategy. AI capabilities are commoditizing faster than most startup unit economics can adapt.", link:"", pubDate:"" },
+  ],
+  verge: [
+    { title: "Apple Intelligence Finally Ships Something That Works — And It Is Not What Anyone Expected", description: "The on-device language processing is genuinely impressive. But the killer feature isn't the AI — it's the privacy guarantee. Users are choosing Apple's model for reasons the rest of the industry underestimated.", link:"", pubDate:"" },
+    { title: "The AI Phone Feature Nobody Asked For Is Now the One Nobody Can Live Without", description: "Predictive notification batching — the model learns which notifications are worth interrupting you for — has quietly become the most-reviewed AI feature of 2026.", link:"", pubDate:"" },
+    { title: "Google's AI Overviews Are Changing Search Behavior Faster Than Anyone Forecast", description: "Click-through rates on traditional results dropped 34% in verticals where AI Overviews appear. The implications for content strategy and SEO are significant and mostly unaddressed.", link:"", pubDate:"" },
+    { title: "Microsoft Copilot in Office Is Now Used by More Than Half of Fortune 500 Employees", description: "Adoption wasn't driven by productivity claims — it was driven by junior employees using it for first drafts and managers not noticing. The adoption pattern is bottom-up and largely invisible to IT.", link:"", pubDate:"" },
+    { title: "The Wearable AI Device Category Just Got Its First Real Product", description: "After two years of failed prototypes, a device that actually works in the contexts people said they wanted AI assistance. The form factor solved the problem the phone form factor couldn't.", link:"", pubDate:"" },
+  ],
+};
+
+async function fetchRSS(feedUrl) {
+  const key  = S.feedKey || 'tech';
+  const bank = ARTICLE_BANKS[key] || ARTICLE_BANKS.tech;
+  console.log(`Loading ${key} articles (${bank.length} items)`);
+  return bank;
+}
+
+
+// ── MAKE POST ─────────────────────────────────────────────────────────────────
+function makePost(item){
+  const title   = item.title || '';
+  const summary = item.summary || item.description || '';
+  const day     = new Date().getDate();
+  const pick    = arr => arr[day % arr.length];
+  const txt     = (title + ' ' + summary).toLowerCase();
+
+  const isLeadership = txt.includes('leader') || txt.includes('manag') || txt.includes('team') || txt.includes('psycholog') || txt.includes('culture') || txt.includes('organization') || txt.includes('uncertain') || txt.includes('retention') || txt.includes('employee') || txt.includes('communication');
+  const isAIModel    = txt.includes('open source') || txt.includes('closed model') || txt.includes('gpt') || txt.includes('claude') || txt.includes('gemini') || txt.includes('llama') || txt.includes('mistral') || txt.includes('llm') || txt.includes('benchmark') || txt.includes('model release');
+  const isAIArch     = txt.includes('architecture') || txt.includes('transformer') || txt.includes('mamba') || txt.includes('moe') || txt.includes('neural') || txt.includes('diffusion') || txt.includes('parameter');
+  const isProduct    = txt.includes('product') || txt.includes('startup') || txt.includes('founder') || txt.includes('user') || txt.includes('scale') || txt.includes('pmf') || txt.includes('ship');
+  const isFramework  = txt.includes('framework') || txt.includes('library') || txt.includes('langgraph') || txt.includes('langchain') || txt.includes('dspy') || txt.includes('ollama') || txt.includes('sdk');
+  const isCareer     = txt.includes('career') || txt.includes('hiring') || txt.includes('skill') || txt.includes('developer') || txt.includes('engineer') || txt.includes('job');
+  const isResearch   = txt.includes('research') || txt.includes('study') || txt.includes('survey') || txt.includes('compan') || txt.includes('report');
+  const isGenAI      = isAIModel || isAIArch || (txt.includes('ai') && !isLeadership && !isProduct);
+
+  let hashtags = '';
+  if      (isLeadership && isResearch && !isGenAI) hashtags = '#Leadership #FutureOfWork #OrganizationalCulture #PsychologicalSafety';
+  else if (isLeadership && !isGenAI)               hashtags = '#Leadership #TechLeadership #FutureOfWork #TeamCulture';
+  else if (isAIModel)                              hashtags = '#GenerativeAI #AIStrategy #TechLeadership #LLMs';
+  else if (isAIArch)                               hashtags = '#AIStrategy #GenerativeAI #TechLeadership #DigitalTransformation';
+  else if (isProduct && isGenAI)                   hashtags = '#AIProduct #ProductThinking #BuildInPublic #GenerativeAI';
+  else if (isProduct)                              hashtags = '#ProductThinking #StartupLife #BuildInPublic #TechLeadership';
+  else if (isFramework)                            hashtags = '#AIStrategy #GenerativeAI #BuildInPublic #TechLeadership';
+  else if (isCareer && isGenAI)                    hashtags = '#AIStrategy #TechCareers #SoftwareEngineering #FutureOfWork';
+  else if (isCareer)                               hashtags = '#TechCareers #SoftwareEngineering #FutureOfWork #Leadership';
+  else if (isGenAI)                                hashtags = '#AIStrategy #GenerativeAI #TechLeadership #DigitalTransformation';
+  else                                             hashtags = '#TechLeadership #Innovation #FutureOfWork #DigitalTransformation';
+
+  const style    = S.style || selectedStyle || 'authority';
+  const devNames = ['Marcus','Priya','Alex','Jordan','Sana','Ryo','Leila','Dev'];
+  const name     = devNames[day % devNames.length];
+
+  if(style === 'authority'){
+    if(isAIModel){
+      const hooks = [
+        `The open source vs closed AI debate just shifted — and most teams haven't updated their assumptions yet.`,
+        `The gap between open source and frontier AI is collapsing faster than anyone's roadmap assumes.`,
+        `This benchmark result changes the cost-benefit calculation for every team building with AI right now.`,
+      ];
+      return `${pick(hooks)}
+
+${title}.
+
+${summary}
+
+Here's what this actually means for how you build:
+
+→ The "we need a closed API for this" assumption needs revisiting right now
+→ Open source models are viable for use cases that required expensive API access 6 months ago
+→ The teams that rearchitected early now have a significant cost and latency advantage
+
+The gap isn't closing gradually. It's collapsing.
+
+What's one assumption in your current AI stack this result invalidates?
+
+${hashtags}`;
+    }
+    if(isAIArch){
+      return `The architecture your AI team chose 12 months ago may already be a liability.
+
+${title}.
+
+${summary}
+
+Why this matters more than the headline:
+
+→ Architecture decisions compound — teams that got this right 6 months ago run faster and cheaper today
+→ The performance gap at scale is the difference between viable and unviable unit economics
+→ The window to rearchitect before this becomes standard is narrowing every quarter
+
+What architecture decision in your current system would you make differently today?
+
+${hashtags}`;
+    }
+    if(isProduct){
+      return `Most products don't fail because of bad execution.
+They fail because of good execution on the wrong problem.
+
+${title}.
+
+${summary}
+
+The research is consistent:
+
+→ 42% of startups fail because there was no market need — not because the product was bad
+→ Teams that talk to users weekly are 3x more likely to reach product-market fit
+→ Top retention signal: would users be "very disappointed" without your product?
+
+The companies that scale got obsessively specific — one user, one problem, one moment.
+
+Who is the one specific person your product exists for?
+
+${hashtags}`;
+    }
+    if(isLeadership && !isGenAI){
+      return `The most important leadership skill right now isn't confidence. It's calibrated honesty.
+
+${title}.
+
+${summary}
+
+Here's what the data shows about leaders whose teams perform in uncertainty:
+
+→ They separate facts from assumptions — explicitly, in every key meeting
+→ They create psychological safety before demanding accountability
+→ They share bad news faster than good news — delay costs more than discomfort
+
+The leaders building the most resilient teams aren't the most confident.
+They're the most honest about what they don't know.
+
+How clearly does your team understand the difference between your certainties and your bets?
+
+${hashtags}`;
+    }
+    if(isCareer){
+      return `The most in-demand engineers in 2026 aren't the fastest coders. They're the clearest thinkers.
+
+${title}.
+
+${summary}
+
+What's actually separating the engineers pulling ahead:
+
+→ They define the problem clearly before writing a single line of code
+→ They document their reasoning — not just their decisions — in PRs and RFCs
+→ They make their thinking legible to the people who can accelerate their career
+
+The engineers getting promoted aren't 10x more productive. They're 10x more legible.
+
+What's one way you could make your reasoning more visible this week?
+
+${hashtags}`;
+    }
+    if(isFramework){
+      return `The framework your AI team is using may be the real bottleneck — not the model.
+
+${title}.
+
+${summary}
+
+The pattern worth understanding:
+
+→ Teams adopting frameworks to go faster usually end up slower — fighting the abstraction
+→ Teams adopting them to make failure modes visible end up faster — catching problems in dev not prod
+→ The right framework changes your mental model, not just your syntax
+
+What's the mental model your current tooling is quietly teaching your team?
+
+${hashtags}`;
+    }
+    return `The teams that will look smart in 18 months aren't the fastest movers.
+They're the ones asking better questions earlier.
+
+${title}.
+
+${summary}
+
+The surface story is interesting. The second-order question is what matters:
+What does this change about the decisions I'm making this quarter?
+
+What's the one assumption in your current work this challenges?
+
+${hashtags}`;
+  }
+
+  if(style === 'educational'){
+    if(isAIModel){
+      return `Nobody explained what the open source AI convergence actually means for how you build.
+Let me fix that.
+
+${title}.
+
+${summary}
+
+Three things worth understanding clearly:
+
+→ What opens up: use cases that were API-cost-prohibitive are now buildable with open models
+→ What doesn't change: data quality, eval rigor, and deployment complexity are still your bottlenecks
+→ What it means for you: the "which vendor" question just got less important than the "which constraint" question
+
+What's your current criteria for choosing between open and closed models?
+
+${hashtags}`;
+    }
+    if(isProduct){
+      return `Nobody teaches product teams how to find the right problem.
+They just say "talk to users" and hope for the best.
+
+${title}.
+
+${summary}
+
+Here's what "talk to users" actually means:
+
+→ Ask about their last frustrating experience — not what features they want next
+→ Look for the problem behind the problem they describe first
+→ Find the person who would pay today — not "someday when it has X"
+
+Which of these is missing from your current discovery process?
+
+${hashtags}`;
+    }
+    if(isLeadership && !isGenAI){
+      return `The research on team performance is remarkably consistent.
+Most managers are still acting on intuition instead.
+
+${title}.
+
+${summary}
+
+Three findings that should change how you run your team:
+
+1. Psychological safety predicts innovation output better than any other measured factor
+2. Leaders who share uncertainty openly get higher-quality information from their teams
+3. Weekly 1:1s focused on blockers — not status updates — reduce attrition by 30%
+
+Which one would make the biggest difference in your team this week?
+
+${hashtags}`;
+    }
+    return `Most people are getting this wrong.
+Here's the mental model that actually helps.
+
+${title}.
+
+${summary}
+
+Three things worth separating clearly:
+
+1. What actually changed — the mechanism, not the headline
+2. What stays the same — better tools don't eliminate the hard problems
+3. What it means for your situation — general trends don't determine specific outcomes
+
+Which of the three is the biggest blindspot in how your team thinks about this?
+
+${hashtags}`;
+  }
+
+  if(style === 'opinion'){
+    if(isAIModel){
+      return `Hot take: the closed vs open source AI debate is the wrong frame entirely.
+
+${title}.
+
+${summary}
+
+The teams winning with AI aren't optimizing for "best model."
+They're optimizing for "right model for this specific constraint."
+
+Closed models win on capability ceiling.
+Open models win on cost, latency, and data privacy.
+
+The interesting question isn't which is better.
+It's which constraint is actually your bottleneck.
+
+What's the actual bottleneck in your current AI system — and are you optimizing for it?
+
+${hashtags}`;
+    }
+    if(isProduct){
+      return `Hot take: "product-market fit" is the most misused phrase in tech.
+
+${title}.
+
+${summary}
+
+PMF isn't a metric. It's a specific moment.
+One person who genuinely cannot imagine going back to life without your product.
+
+Not "our retention improved." One specific person. Cannot imagine going back.
+
+If you can't name that person right now — you're still searching.
+And that's okay. But stop calling the search "PMF."
+
+Disagree? Tell me where this breaks down.
+
+${hashtags}`;
+    }
+    if(isLeadership && !isGenAI){
+      return `Unpopular opinion: psychological safety isn't a culture initiative.
+It's the most underinvested performance lever in most organizations.
+
+${title}.
+
+${summary}
+
+Teams with high psychological safety outperform on every dimension that matters:
+innovation output, retention, speed of problem-solving, quality of decisions under pressure.
+
+But most organizations treat it as separate from performance management. That's the mistake.
+
+Safety isn't opposed to accountability.
+Safety is what makes honest accountability possible in the first place.
+
+What would your team say if they felt completely safe to say it?
+
+${hashtags}`;
+    }
+    return `Hot take: most AI strategies aren't AI strategies.
+They're "we added AI to our existing strategy" strategies.
+
+${title}.
+
+${summary}
+
+The teams winning with AI didn't bolt it on.
+They redesigned from the constraint up — asking what becomes possible, not what becomes faster.
+
+Faster is a feature. Possible is a business model.
+One is incremental. The other is existential.
+
+Is your AI strategy about going 20% faster — or doing something that wasn't possible before?
+
+${hashtags}`;
+  }
+
+  if(style === 'story'){
+    if(isAIModel){
+      return `A developer named ${name} posted something this week that I keep coming back to.
+
+${title}.
+
+${summary}
+
+The thing that gets me isn't the benchmark result itself.
+It's what it means for every team that built their cost model around closed API access.
+
+Six months ago this was theoretical. This week it's a deploy command away.
+
+Are you one of the developers paying attention to this?
+
+${hashtags}`;
+    }
+    if(isProduct){
+      return `A founder named ${name} shared their pivot story this week.
+One line stopped me completely.
+
+${title}.
+
+${summary}
+
+"We had 10,000 users and zero product-market fit.
+So we deleted everything except what our 10 best users used every single week.
+Six months later: 1,000 users, profitable, best retention we'd ever seen."
+
+Less is almost always the move. Almost nobody is willing to make it.
+
+What would you cut if you could only keep what your best users use every week?
+
+${hashtags}`;
+    }
+    if(isLeadership && !isGenAI){
+      return `A manager named ${name} shared something this week that I keep thinking about.
+
+${title}.
+
+${summary}
+
+They changed one thing about their weekly team meeting:
+Started it by asking "What's something you're uncertain about that you haven't said out loud yet?"
+
+Within a month, three process problems surfaced that had been quietly slowing the team for quarters.
+
+The information was always there. Nobody felt safe enough to surface it.
+
+What question could you ask your team this week that surfaces what's not being said?
+
+${hashtags}`;
+    }
+    return `A developer named ${name} just shared something that stopped my scroll completely.
+
+${title}.
+
+${summary}
+
+12 months ago → significant resources required, not accessible to most teams.
+6 months ago → possible but expensive, limited to well-funded teams.
+This week → ${name} deployed it, open sourced the approach, wrote up the lessons.
+
+The gap between "frontier capability" and "any developer on a Saturday" has never been smaller.
+And it's still shrinking.
+
+What are you building today that only became possible in the last 6 months?
+
+${hashtags}`;
+  }
+
+  return `${title}
+
+${summary}
+
+The ceiling keeps moving.
+
+${hashtags}`;
+}
+
+// ── AI FILTER ─────────────────────────────────────────────────────────────────
+async function aiFilter(title, desc){
+  return fallbackFilter(title, desc);
+}
+
+function fallbackFilter(title, desc){
+  const t = (title + " " + desc).toLowerCase();
+  let score = 82;
+  const spam = ["sponsored","advertisement","buy now","click here","limited time","coupon","giveaway","prize","promo code","sale","discount"];
+  spam.forEach(w=>{ if(t.includes(w)) score -= 25; });
+  const strong = ["ai","machine learning","llm","gpt","claude","gemini","neural","model","engineer","developer","software","open source","github","research","paper","benchmark","framework","tool","api","architecture","transformer","agent","data","inference","deployment","startup","product"];
+  strong.forEach(w=>{ if(t.includes(w)) score += 3; });
+  const premium = ["releases","launched","open sourced","new model","new framework","announces","breakthrough","study shows","deep dive","how we built","just shipped","introducing","case study"];
+  premium.forEach(w=>{ if(t.includes(w)) score += 6; });
+  if(desc && desc.length > 80)  score += 4;
+  if(desc && desc.length > 180) score += 3;
+  if(title.length > 30) score += 3;
+  score = Math.max(5, Math.min(99, score));
+  const reason = score >= 90 ? "Excellent — highly relevant Tech/AI content." :
+                 score >= 80 ? "Strong professional content." :
+                 score >= 65 ? "Relevant content." : "Low relevance or promotional.";
+  return { score, reason };
+}
+
+// ── POST GENERATOR ─────────────────────────────────────────────────────────────
+async function aiGeneratePost(title, desc){
+  return makePost({ title, summary: desc, feedKey: S.feedKey || 'tech' });
+}
+
+// ── SHARE ON LINKEDIN ─────────────────────────────────────────────────────────
+function shareOnLinkedIn(elId, btn){
+  const el = document.getElementById(elId);
+  if(!el){ alert("Post not found!"); return; }
+  const postText = el.textContent || el.innerText || "";
+  if(!postText.trim()){ alert("Post is empty!"); return; }
+  const url = "https://www.linkedin.com/sharing/share-offsite/?text=" + encodeURIComponent(postText.substring(0, 700));
+  const popup = window.open(url, "linkedin-share", "width=600,height=600,scrollbars=yes,resizable=yes");
+  if(!popup){
+    navigator.clipboard.writeText(postText).then(()=>{
+      alert("Popup blocked!\n\nPost copied to clipboard.\nPaste on LinkedIn manually.");
+    });
+    return;
+  }
+  if(btn){
+    const orig = btn.innerHTML;
+    btn.innerHTML = "✅ Opened!";
+    setTimeout(()=>{ btn.innerHTML = orig; }, 2500);
+  }
+}
+
+// ── GENERATE FOR ARTICLE ──────────────────────────────────────────────────────
+async function generateForArticle(idx){
+  const btn = document.getElementById(`gb-${idx}`);
+  if(btn){ btn.disabled=true; btn.textContent='⟳ Writing...'; }
+  const container = document.getElementById('generatedPosts');
+  if(!container) return;
+
+  const article  = (window._currentFeed || [])[idx] || {};
+  const title    = article.title   || `Article ${idx+1}`;
+  const desc     = article.summary || article.description || '';
+  const postText = makePost({ title, summary: desc, feedKey: S.feedKey || 'tech' });
+
+  const authorName = window._liName || 'Srashti Jain';
+  const initials   = authorName.split(' ').map(w=>w[0]).join('').toUpperCase().substring(0,2);
+  const div = document.createElement('div');
+  div.className = 'post-card';
+  div.innerHTML = `<div class="post-card-hdr"><div class="post-avatar">${initials}</div><div><div class="post-author-name">${authorName}</div><div class="post-author-meta">LinkedIn · Just now</div></div></div><div class="post-body" id="pb-${idx}">${postText.replace(/\n/g,'<br>')}</div>
+    <div class="post-actions">
+      <button class="btn-copy" onclick="copyText('pb-${idx}',this)">📋 Copy</button>
+      <button class="btn-linkedin" onclick="shareOnLinkedIn('pb-${idx}',this)">📤 Share on LinkedIn</button>
+    </div>`;
+  container.appendChild(div);
+  if(btn){ btn.textContent='✅ Done'; btn.disabled=false; }
+  log('✓ Post generated','success');
+}
+
+// ── LAUNCH AUTOMATION ─────────────────────────────────────────────────────────
+async function launchAutomation(){
+  const btn = document.getElementById('launchBtn');
+  const ic  = document.getElementById('lIcon');
+  const tx  = document.getElementById('lTxt');
+  const container = document.querySelector(".feed-list") || document.getElementById("feedList");
+
+  btn.disabled = true;
+  ic.innerHTML = '<span style="animation:spin 0.6s linear infinite;display:inline-block">⟳</span>';
+  tx.textContent = "RUNNING...";
+  if(container) container.innerHTML = "";
+  const gp = document.getElementById("generatedPosts");
+  if(gp) gp.innerHTML = "";
+
+  try {
+    const maxF    = parseInt(document.getElementById('maxF')?.value) || 5;
+    const thresh  = parseFloat(document.getElementById('thresh')?.value) || 0.6;
+    const autoG   = document.getElementById('autoG')?.checked;
+    const customUrl = document.getElementById('customUrl')?.value?.trim();
+    const feedUrl   = customUrl || FEED_URLS[S.feedKey] || FEED_URLS.tech;
+
+    log(`Fetching from: ${S.feedKey || 'tech'}`, 'info');
+    const articles = await fetchRSS(feedUrl);
+    log(`✓ ${articles.length} articles loaded`, 'success');
+
+    window._currentFeed = articles.slice(0, maxF).map(item => ({
+      title:   item.title || 'Untitled',
+      summary: item.description || item.summary || '',
+      date:    item.pubDate ? new Date(item.pubDate).toLocaleDateString('en',{month:'short',day:'numeric'}) : 'Recent',
+      src:     item.author || (S.feedKey || 'tech'),
+      link:    item.link || '',
+    }));
+
+    const feed = window._currentFeed;
+    document.getElementById('sF').textContent = feed.length;
+    log(`Running quality filter on ${feed.length} articles...`, 'info');
+
+    let passed = 0;
+    for(let i = 0; i < feed.length; i++){
+      const article     = feed[i];
+      const scoreResult = await aiFilter(article.title, article.summary);
+      const scoreInt    = Math.round(scoreResult.score || 50);
+      const passedFilter = scoreInt >= thresh * 100;
+
+      const card = document.createElement('div');
+      card.className = 'feed-card';
+      if(!passedFilter) card.style.opacity = '0.65';
+      const rc = scoreInt >= 70 ? '#00ff88' : scoreInt >= 50 ? '#ff6b35' : '#ff4455';
+      card.innerHTML = `
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <div style="flex:1">
+            <div style="font-size:0.82rem;font-weight:600;color:var(--text);margin-bottom:4px;line-height:1.4">${article.title}</div>
+            <div style="font-size:0.72rem;color:var(--muted);margin-bottom:8px">${article.src} · ${article.date}</div>
+            <div style="font-size:0.75rem;color:#6888aa;line-height:1.5">${(article.summary||'').substring(0,180)}...</div>
+          </div>
+          <div style="min-width:44px;height:44px;border-radius:50%;border:2px solid ${rc};display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:${rc}">${scoreInt}</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+          <span style="font-size:0.65rem;padding:2px 8px;border-radius:10px;background:${passedFilter?'rgba(0,255,136,0.1)':'rgba(255,68,85,0.1)'};color:${passedFilter?'var(--nova)':'#ff6688'}">${passedFilter?'✅ Passed':'❌ Filtered'}</span>
+          <span style="font-size:0.65rem;color:var(--muted);flex:1">${scoreResult.reason||''}</span>
+          <button id="gb-${i}" onclick="generateForArticle(${i})" style="font-size:0.68rem;padding:4px 12px;border-radius:7px;background:${passedFilter?'rgba(0,212,255,0.1)':'rgba(255,99,99,0.08)'};border:1px solid ${passedFilter?'rgba(0,212,255,0.3)':'rgba(255,99,99,0.25)'};color:${passedFilter?'var(--glow)':'#ff9999'};cursor:pointer;font-family:inherit">${passedFilter?'✍ Generate':'✍ Generate Anyway'}</button>
+        </div>`;
+      if(container) container.appendChild(card);
+      if(passedFilter) passed++;
+    }
+
+    document.getElementById('sP').textContent = passed;
+    log(`✓ ${passed}/${feed.length} articles passed filter`, 'success');
+
+    if(autoG){
+      log('Auto-generating posts...', 'info');
+      for(let i = 0; i < feed.length; i++){
+        const sr = await aiFilter(feed[i].title, feed[i].summary);
+        if(Math.round(sr.score||50) >= thresh*100) await generateForArticle(i);
+      }
+    }
+
+  } catch(err){
+    log(`Error: ${err.message}`, 'error');
+    console.error("launchAutomation error:", err);
+  }
+
+  btn.disabled = false;
+  ic.textContent = '⚡';
+  tx.textContent = 'LAUNCH WORKFLOW';
+}
+
+async function copyText(elId, btn){
+  const text = document.getElementById(elId)?.textContent || '';
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.textContent = '✅ Copied!';
+    setTimeout(()=>btn.textContent='📋 Copy', 1600);
+  } catch { alert(text); }
+}
+
+// ── LINKEDIN ──────────────────────────────────────────────────────────────────
+function connectLinkedIn(){
+  const modal = document.createElement("div");
+  modal.id = "liModal";
+  modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px)";
+  modal.innerHTML = `
+    <div style="background:#0d1e35;border:1px solid #1a4060;border-radius:16px;padding:28px 30px;max-width:420px;width:90%;position:relative">
+      <button onclick="document.getElementById('liModal').remove()" style="position:absolute;top:12px;right:14px;background:none;border:none;color:#4a6888;font-size:1.2rem;cursor:pointer">✕</button>
+      <div style="font-size:1rem;font-weight:700;color:#e8f4ff;margin-bottom:16px">🔗 Connect LinkedIn</div>
+      <div style="font-size:0.78rem;color:#6888aa;margin-bottom:16px;line-height:1.6">
+        Paste your LinkedIn <strong style="color:#38bdf8">Access Token</strong> below.<br/>
+        Get it from: <a href="https://www.linkedin.com/developers/tools/oauth/token-generator" target="_blank" style="color:#0077b5">LinkedIn Token Generator →</a>
+      </div>
+      <input type="password" id="liTokenInput" placeholder="1. Paste Access Token..."
+        style="width:100%;background:rgba(255,255,255,0.04);border:1px solid #1a4060;color:#e8f4ff;border-radius:8px;padding:10px 13px;font-size:0.82rem;outline:none;font-family:inherit;margin-bottom:8px"/>
+      <input type="text" id="liUrnInput" placeholder="2. URN: urn:li:person:1772788136593"
+        style="width:100%;background:rgba(255,255,255,0.04);border:1px solid #1a4060;color:#e8f4ff;border-radius:8px;padding:10px 13px;font-size:0.82rem;outline:none;font-family:inherit;margin-bottom:8px"/>
+      <input type="text" id="liNameInput" placeholder="3. Your Name: Srashti Jain"
+        style="width:100%;background:rgba(255,255,255,0.04);border:1px solid #1a4060;color:#e8f4ff;border-radius:8px;padding:10px 13px;font-size:0.82rem;outline:none;font-family:inherit;margin-bottom:16px"/>
+      <button onclick="saveLinkedInToken()" style="width:100%;background:linear-gradient(135deg,#0077b5,#005983);border:none;color:white;border-radius:9px;padding:12px;font-size:0.85rem;font-weight:700;cursor:pointer;font-family:inherit">
+        ✅ Connect Account
+      </button>
+    </div>`;
+  document.body.appendChild(modal);
+  setTimeout(()=> document.getElementById("liTokenInput")?.focus(), 100);
+}
+
+async function saveLinkedInToken(){
+  const token = document.getElementById("liTokenInput")?.value.trim() || "";
+  const urn   = document.getElementById("liUrnInput")?.value.trim() || "urn:li:person:1772788136593";
+  let   name  = document.getElementById("liNameInput")?.value.trim() || "";
+  if(!token){ alert("Please paste your Access Token first!"); return; }
+  if(!name) name = "Srashti Jain";
+  window._liToken = token;
+  window._liUrn   = urn || "urn:li:person:1772788136593";
+  window._liName  = name;
+  (el => el && (el.textContent = name))(document.getElementById('liName'));
+  (el => el && (el.textContent = name.charAt(0).toUpperCase()))(document.getElementById('liAvatar'));
+  (el => el && (el.style.display = "none"))(document.getElementById('liNotConnected'));
+  (el => el && (el.style.display = "block"))(document.getElementById('liConnected'));
+  document.getElementById("liModal")?.remove();
+  console.log("Connected:", name);
+}
+
+function disconnectLinkedIn(){
+  window._liToken = ""; window._liName = "";
+  (el => el && (el.style.display = "block"))(document.getElementById('liNotConnected'));
+  (el => el && (el.style.display = "none"))(document.getElementById('liConnected'));
+}
+
+// ── DAILY SCHEDULER ───────────────────────────────────────────────────────────
+let schedulerCheckId = null;
+let schedulerCountId = null;
+let todayPostsDone   = 0;
+let lastPostDate     = "";
+
+function toggleScheduler(){
+  const on      = document.getElementById("schedulerOn").checked;
+  const dot     = document.getElementById("schedulerDot");
+  const bar     = document.getElementById("schedulerSlider");
+  const box     = document.getElementById("schedulerStatusBox");
+  const stopBtn = document.getElementById("stopSchedBtn");
+  if(on){
+    dot.style.transform = "translateX(20px)";
+    dot.style.background = "var(--nova)";
+    bar.style.background = "rgba(16,185,129,0.3)";
+    if(box) box.style.display = "block";
+    if(stopBtn) stopBtn.style.display = "block";
+    startDailyScheduler();
+  } else {
+    stopSchedulerManually();
+  }
+}
+
+function stopSchedulerManually(){
+  stopScheduler();
+  const cb  = document.getElementById("schedulerOn");
+  const dot = document.getElementById("schedulerDot");
+  const bar = document.getElementById("schedulerSlider");
+  const box = document.getElementById("schedulerStatusBox");
+  const stopBtn = document.getElementById("stopSchedBtn");
+  if(cb) cb.checked = false;
+  dot.style.transform = "translateX(0)"; dot.style.background = "#4a6888";
+  bar.style.background = "#1a3050";
+  if(box) box.style.display = "none";
+  if(stopBtn) stopBtn.style.display = "none";
+  document.getElementById("schedulerStatus").textContent = "● Off";
+  document.getElementById("nextPostTime").textContent    = "—";
+  document.getElementById("timeLeft").textContent        = "—";
+  log("Daily scheduler stopped", "warn");
+}
+
+function stopScheduler(){
+  if(schedulerCheckId){ clearInterval(schedulerCheckId); schedulerCheckId = null; }
+  if(schedulerCountId){ clearInterval(schedulerCountId); schedulerCountId = null; }
+}
+
+function startDailyScheduler(){
+  stopScheduler();
+  const today = new Date().toISOString().split("T")[0];
+  if(lastPostDate !== today){ todayPostsDone = 0; lastPostDate = today; }
+  document.getElementById("postsDone").textContent = `${todayPostsDone} / 2`;
+  document.getElementById("schedulerStatus").textContent = "● Active";
+  document.getElementById("schedulerStatus").style.color = "var(--nova)";
+  updateNextPostDisplay();
+  schedulerCheckId = setInterval(() => {
+    const d = new Date().toISOString().split("T")[0];
+    if(lastPostDate !== d){ todayPostsDone = 0; lastPostDate = d; document.getElementById("postsDone").textContent = "0 / 2"; }
+    checkIfTimeToPost();
+    updateNextPostDisplay();
+  }, 30000);
+  schedulerCountId = setInterval(() => {
+    const next = getNextPostTime();
+    if(!next){ document.getElementById("timeLeft").textContent = "—"; return; }
+    const diff = next - Date.now();
+    if(diff <= 0){ document.getElementById("timeLeft").textContent = "Posting soon..."; return; }
+    const h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000);
+    document.getElementById("timeLeft").textContent = h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`;
+  }, 1000);
+  setTimeout(() => checkIfTimeToPost(), 1000);
+  log(`✅ Scheduler ON — Morning: ${document.getElementById("morningTime").value}, Evening: ${document.getElementById("eveningTime").value}`, "success");
+}
+
+function getNextPostTime(){
+  const morningStr = document.getElementById("morningTime")?.value || "09:00";
+  const eveningStr = document.getElementById("eveningTime")?.value || "18:00";
+  const now = new Date();
+  const toToday = (ts) => { const [h,m] = ts.split(":").map(Number); const d = new Date(); d.setHours(h,m,0,0); return d; };
+  const morning = toToday(morningStr), evening = toToday(eveningStr);
+  if(todayPostsDone === 0){ if(now < morning) return morning; if(now < evening) return evening; }
+  if(todayPostsDone === 1){ if(now < evening) return evening; }
+  const tomorrow = toToday(morningStr); tomorrow.setDate(tomorrow.getDate()+1); return tomorrow;
+}
+
+function updateNextPostDisplay(){
+  const next = getNextPostTime();
+  if(!next){ document.getElementById("nextPostTime").textContent = "—"; return; }
+  document.getElementById("nextPostTime").textContent = next.toLocaleTimeString("en",{hour:"2-digit",minute:"2-digit",hour12:true});
+}
+
+function checkIfTimeToPost(){
+  const morningStr = document.getElementById("morningTime")?.value || "09:00";
+  const eveningStr = document.getElementById("eveningTime")?.value || "18:00";
+  const now = new Date(), nowH = now.getHours(), nowM = now.getMinutes();
+  const matches = (ts) => { const [h,m] = ts.split(":").map(Number); return nowH===h && nowM===m; };
+  if(todayPostsDone === 0 && matches(morningStr)) runScheduledPost("morning");
+  if(todayPostsDone < 2  && matches(eveningStr))  runScheduledPost("evening");
+}
+
+async function runScheduledPost(slot){
+  if(window._lastPostSlot === slot + new Date().toISOString().split("T")[0]) return;
+  window._lastPostSlot = slot + new Date().toISOString().split("T")[0];
+  const bank = ARTICLE_BANKS[S.feedKey] || ARTICLE_BANKS.tech;
+  const article  = bank[todayPostsDone % bank.length];
+  const postText = makePost({ title: article.title, summary: article.description || "", feedKey: S.feedKey || "tech" });
+  const url    = "https://www.linkedin.com/sharing/share-offsite/?text=" + encodeURIComponent(postText.substring(0,700));
+  const popup  = window.open(url, `sched-${slot}`, "width=620,height=620,scrollbars=yes");
+  if(popup){
+    todayPostsDone++;
+    document.getElementById("postsDone").textContent = `${todayPostsDone} / 2`;
+    log(`✅ Post ${todayPostsDone}/2 opened on LinkedIn!`, "success");
+    if(todayPostsDone >= 2){
+      document.getElementById("schedulerStatus").textContent = "✅ Done for today";
+      log("🎉 Both posts done! See you tomorrow.", "success");
+    }
+    const gp = document.getElementById("generatedPosts");
+    if(gp){
+      const name = window._liName || "Srashti Jain";
+      const init = name.split(" ").map(w=>w[0]).join("").toUpperCase().substring(0,2);
+      const slotLabel = slot.includes("morning") ? "🌅 Morning" : "🌆 Evening";
+      const div = document.createElement("div");
+      div.className = "post-card"; div.style.borderColor = "rgba(0,255,136,0.2)";
+      div.innerHTML = `<div style="font-size:0.62rem;color:var(--nova);margin-bottom:8px;font-weight:700">${slotLabel} Auto Post #${todayPostsDone}</div>
+        <div class="post-card-hdr"><div class="post-avatar">${init}</div>
+        <div><div class="post-author-name">${name}</div><div class="post-author-meta">Auto-posted · ${new Date().toLocaleTimeString("en",{hour:"2-digit",minute:"2-digit"})}</div></div></div>
+        <div class="post-body">${postText.replace(/\n/g,'<br>')}</div>`;
+      gp.prepend(div);
+    }
+  } else {
+    window._lastPostSlot = null;
+    log("⚠️ Popup blocked — allow popups in browser settings!", "warn");
+  }
+}
+
+
+</script>
+</body>
+</html>

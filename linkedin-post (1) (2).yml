@@ -1,0 +1,38 @@
+name: LinkedIn Auto Post
+
+on:
+  schedule:
+    # Post 2x daily — 9 AM and 6 PM IST (3:30 AM and 12:30 PM UTC)
+    - cron: '30 3 * * *'   # 9:00 AM IST
+    - cron: '30 12 * * *'  # 6:00 PM IST
+
+  # Also allows manual trigger from GitHub UI
+  workflow_dispatch:
+    inputs:
+      post_count:
+        description: 'How many posts to publish'
+        required: false
+        default: '1'
+
+jobs:
+  post-to-linkedin:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install node-fetch
+
+      - name: Run LinkedIn poster
+        env:
+          LI_TOKEN: ${{ secrets.LI_TOKEN }}
+          LI_URN:   ${{ secrets.LI_URN }}
+          FEED_KEY: ${{ secrets.FEED_KEY }}
+        run: node scripts/post.js
