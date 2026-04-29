@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 // LinkedFlow AI — LinkedIn Auto Post Script
-// Flow: RSS Feed → Pick Article → Claude AI → LinkedIn Post
+// Flow: RSS Feed → Pick Article → Groq AI → LinkedIn Post
 // Runs via EC2 cron job 2x per day
 // ═══════════════════════════════════════════════════════════════
 
@@ -13,7 +13,7 @@ const ai    = require('./ai-wrapper');
 const LI_TOKEN   = process.env.LI_TOKEN;
 const LI_URN     = process.env.LI_URN     || 'urn:li:person:RnlYLWz_a3';
 const FEED_URL   = process.env.FEED_URL   || 'https://techcrunch.com/feed/';
-const POST_STYLE = process.env.POST_STYLE || 'auto'; // auto | authority | educational | opinion | story
+const POST_STYLE = process.env.POST_STYLE || 'auto';
 
 // ── FETCH RSS ─────────────────────────────────────────────────────────────────
 function fetchRSS(url) {
@@ -57,16 +57,16 @@ function pickArticle(items) {
   return items[idx % items.length];
 }
 
-// ── GENERATE POST WITH CLAUDE ─────────────────────────────────────────────────
+// ── GENERATE POST WITH GROQ ───────────────────────────────────────────────────
 async function generatePost(article) {
-  const styles    = ['authority', 'educational', 'opinion', 'story'];
-  const style     = POST_STYLE === 'auto'
+  const styles = ['authority', 'educational', 'opinion', 'story'];
+  const style  = POST_STYLE === 'auto'
     ? styles[new Date().getDay() % styles.length]
     : POST_STYLE;
 
   const styleGuides = {
     authority:
-      'Write as a bold thought leader. Open with a provocative 1-2 line claim that stops scrolling. Build tension with context. Give 3 sharp bullet insights using arrow symbol. End with ONE question that sparks debate.',
+      'Write as a bold thought leader. Open with a provocative 1-2 line claim that stops scrolling. Build tension with context. Give 3 sharp bullet insights using ->. End with ONE question that sparks debate.',
     educational:
       'Write as a teacher. Open with "Most [people/teams/companies] get X wrong." Break it down with 3 numbered insights. End with a question like "Which of these is your team skipping?"',
     opinion:
@@ -96,11 +96,11 @@ Hard rules:
 
 Post:`;
 
-  console.log(`\n🤖 Generating ${style} post with Claude...`);
+  console.log(`\n🤖 Generating ${style} post with Groq...`);
 
   const postText = await ai.chat(prompt, {
-    provider   : 'claude',
-    model      : 'claude-sonnet-4-6',
+    provider   : 'groq',
+    model      : 'llama-3.3-70b-versatile',
     temperature: 0.82,
     maxTokens  : 700,
   });
@@ -171,7 +171,7 @@ async function main() {
   console.log(`\n📰 Selected: "${article.title}"`);
   console.log(`🔗 ${article.link}`);
 
-  // Step 3: Generate post with Claude
+  // Step 3: Generate post with Groq
   const { text, style } = await generatePost(article);
   console.log(`🎨 Style: ${style}`);
   console.log('\n📝 Post preview:');
