@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
-// LinkedFlow AI — LinkedIn Auto Post Script
+// LinkedFlow AI — LinkedIn Auto Post Script v2.0
 // Flow: RSS Feed → Pick Article → Groq AI → LinkedIn Post
-// Runs via EC2 cron job 2x per day
+// High Quality Posts — 90+ Rating Target
 // ═══════════════════════════════════════════════════════════════
 
 require('dotenv').config();
@@ -42,7 +42,7 @@ function parseRSS(xml) {
       return m ? m[1].replace(/<[^>]+>/g, '').trim() : '';
     };
     const title = get('title');
-    const desc  = get('description').substring(0, 400);
+    const desc  = get('description').substring(0, 500);
     const link  = get('link');
     const date  = get('pubDate');
     if (title) items.push({ title, desc, link, date });
@@ -57,7 +57,7 @@ function pickArticle(items) {
   return items[idx % items.length];
 }
 
-// ── GENERATE POST WITH GROQ ───────────────────────────────────────────────────
+// ── GENERATE HIGH QUALITY POST WITH GROQ ─────────────────────────────────────
 async function generatePost(article) {
   const styles = ['authority', 'educational', 'opinion', 'story'];
   const style  = POST_STYLE === 'auto'
@@ -65,44 +65,105 @@ async function generatePost(article) {
     : POST_STYLE;
 
   const styleGuides = {
-    authority:
-      'Write as a bold thought leader. Open with a provocative 1-2 line claim that stops scrolling. Build tension with context. Give 3 sharp bullet insights using ->. End with ONE question that sparks debate.',
-    educational:
-      'Write as a teacher. Open with "Most [people/teams/companies] get X wrong." Break it down with 3 numbered insights. End with a question like "Which of these is your team skipping?"',
-    opinion:
-      'Write as someone with a spicy take. Open with "Hot take:" or "Unpopular opinion:". Challenge conventional wisdom confidently. End with "Disagree? Tell me where this breaks."',
-    story:
-      'Write as a storyteller. Open with a specific person (use a name like Priya, Alex, Marcus). Make it personal and human. Share a surprising insight or reversal. End with a lesson or question.',
+    authority: `
+You are a senior tech executive with 15+ years of experience who just read something that changed your thinking.
+
+Write in FIRST PERSON. Be specific. Be bold.
+
+Structure:
+- Line 1-2: ONE powerful statement that challenges conventional thinking. No fluff.
+- Line 3: Empty line
+- Lines 4-6: Context — why this matters RIGHT NOW. Use numbers/data if possible.
+- Line 7: Empty line  
+- Lines 8-12: Your 3 specific insights, each starting with "→"
+- Line 13: Empty line
+- Lines 14-15: A sharp personal observation from your experience
+- Line 16: Empty line
+- Last line: ONE provocative question that makes readers stop and think
+- Final line: 4-5 hashtags`,
+
+    educational: `
+You are a tech educator who makes complex things simple and actionable.
+
+Write in FIRST PERSON. Teach from experience, not theory.
+
+Structure:
+- Line 1-2: Start with "I spent [X] years learning what most people get wrong about [topic]."
+- Line 3: Empty line
+- Lines 4-5: The common mistake or misconception
+- Line 6: Empty line
+- Lines 7-15: 3 specific numbered lessons with concrete examples
+- Line 16: Empty line
+- Lines 17-18: The real-world impact of applying these lessons
+- Line 19: Empty line
+- Last line: "Which of these surprised you most?"
+- Final line: 4-5 hashtags`,
+
+    opinion: `
+You are a contrarian tech thinker who challenges the status quo with evidence.
+
+Write in FIRST PERSON. Be controversial but backed by logic.
+
+Structure:
+- Line 1: "Hot take:" or "Unpopular opinion:" — then your bold claim
+- Line 2: Empty line
+- Lines 3-4: What everyone else believes (the conventional wisdom)
+- Line 5: Empty line
+- Lines 6-10: Why they're wrong — your specific evidence and reasoning
+- Line 11: Empty line
+- Lines 12-14: What the data/reality actually shows
+- Line 15: Empty line
+- Lines 16-17: The implication — what should change
+- Line 18: Empty line
+- Last line: "Disagree? Tell me where my logic breaks."
+- Final line: 4-5 hashtags`,
+
+    story: `
+You are a tech professional sharing a real, personal story that taught you something unexpected.
+
+Write in FIRST PERSON. Be vulnerable and specific. Make it feel real.
+
+Structure:
+- Line 1-2: Set the scene with a specific moment. "Three years ago, I watched a team of 20 engineers..."
+- Line 3: Empty line
+- Lines 4-6: The problem or challenge — make it relatable
+- Line 7: Empty line
+- Lines 8-10: The unexpected turning point or insight
+- Line 11: Empty line
+- Lines 12-14: What happened as a result — be specific with outcomes
+- Line 15: Empty line
+- Lines 16-17: The lesson distilled into one clear principle
+- Line 18: Empty line
+- Last line: A question that connects the story to the reader's life
+- Final line: 4-5 hashtags`,
   };
 
-  const prompt = `You are a LinkedIn content strategist who writes viral posts for tech professionals.
+  const prompt = `${styleGuides[style]}
 
-Write a LinkedIn post based on this article:
+Now write a LinkedIn post about this article:
 
-Title: ${article.title}
-Summary: ${article.desc}
+Article Title: ${article.title}
+Article Summary: ${article.desc}
 
-Style: ${style}
-Instructions: ${styleGuides[style]}
+QUALITY REQUIREMENTS (this post must score 90+ on LinkedIn engagement):
+1. Hook: First line must stop scrolling — use a surprising stat, bold claim, or unexpected statement
+2. Specificity: Use concrete numbers, timeframes, and examples — never be vague
+3. Personal: Write as if you personally experienced or witnessed this — use "I", "my team", "I've seen"
+4. Tension: Create a problem in the first half, resolve it in the second half
+5. Readability: Maximum 2 sentences per paragraph. Lots of white space.
+6. Emotion: Make the reader feel something — curiosity, urgency, or validation
+7. CTA: End with a question that's easy to answer and sparks discussion
+8. Length: 200-280 words — not too short, not too long
 
-Hard rules:
-- 150-250 words total
-- Short paragraphs, use blank lines between them
-- No emojis except 1-2 max if truly needed
-- Do NOT mention the article URL or say "according to"
-- Sound like a real senior tech professional, not an AI bot
-- End with exactly 4-5 hashtags on the last line (e.g. #AI #GenerativeAI #TechLeadership #Innovation)
-- Write ONLY the post text, nothing else
+Write ONLY the post. No intro. No explanation. Just the post.`;
 
-Post:`;
-
-  console.log(`\n🤖 Generating ${style} post with Groq...`);
+  console.log(`\n🤖 Generating high-quality ${style} post with Groq...`);
 
   const postText = await ai.chat(prompt, {
     provider   : 'groq',
     model      : 'llama-3.3-70b-versatile',
-    temperature: 0.82,
-    maxTokens  : 700,
+    temperature: 0.75,
+    maxTokens  : 900,
   });
 
   return { text: postText.trim(), style };
@@ -154,7 +215,7 @@ function postToLinkedIn(text) {
 
 // ── MAIN ──────────────────────────────────────────────────────────────────────
 async function main() {
-  console.log('🚀 LinkedFlow AI starting...');
+  console.log('🚀 LinkedFlow AI v2.0 starting...');
   console.log(`📅 ${new Date().toISOString()}`);
   console.log(`📡 RSS Feed: ${FEED_URL}`);
 
@@ -171,13 +232,14 @@ async function main() {
   console.log(`\n📰 Selected: "${article.title}"`);
   console.log(`🔗 ${article.link}`);
 
-  // Step 3: Generate post with Groq
+  // Step 3: Generate high quality post
   const { text, style } = await generatePost(article);
   console.log(`🎨 Style: ${style}`);
   console.log('\n📝 Post preview:');
   console.log('─'.repeat(60));
   console.log(text);
   console.log('─'.repeat(60));
+  console.log(`📊 Word count: ${text.split(' ').length}`);
 
   // Step 4: Post to LinkedIn
   console.log('\n📤 Posting to LinkedIn...');
